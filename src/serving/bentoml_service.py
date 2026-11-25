@@ -106,9 +106,22 @@ def _build_service():
     Importing this module must not fail when no Bento has been saved
     yet — `--save` has to be runnable first, and the test suite imports
     the module to check it is syntactically sound.
+
+    It must also not fail when bentoml is absent entirely. The serving
+    container deliberately omits bentoml from requirements-api.txt
+    (Flask is the primary path), so the import has to sit inside the
+    guard rather than beside it.
     """
-    import bentoml
-    from bentoml.io import JSON
+    try:
+        import bentoml
+        from bentoml.io import JSON
+    except ImportError as exc:
+        log.warning(
+            "bentoml is not installed (%s). The Flask API is unaffected; "
+            "install bentoml to use this alternative serving path.",
+            exc,
+        )
+        return None
 
     try:
         model_ref = bentoml.sklearn.get(f"{MODEL_TAG}:latest")

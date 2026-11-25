@@ -4,7 +4,19 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-  { ignores: ["dist", "node_modules"] },
+  // Generated output, never hand-written source. `.vite` is the dev
+  // server's dependency pre-bundle: it is gitignored, so CI never sees
+  // it, but a local `npm run lint` would otherwise report hundreds of
+  // errors from bundled third-party code and hide real ones.
+  {
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      ".vite/**",
+      "coverage/**",
+      "*.min.js",
+    ],
+  },
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
