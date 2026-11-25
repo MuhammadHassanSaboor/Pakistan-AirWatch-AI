@@ -1,0 +1,23 @@
+# Feast configuration.
+#
+# Local file-based offline store and SQLite online store: both are
+# free, need no infrastructure, and are enough to demonstrate the
+# offline -> online materialisation path the specification asks for.
+#
+# Production choice (documented in REPORT.md): the offline store would
+# become Parquet on S3 queried through Athena or DuckDB, and the online
+# store would become Redis, which serves point lookups in ~1 ms versus
+# SQLite's single-writer file lock.
+project: airwatch
+provider: local
+
+registry: data/registry.db
+
+offline_store:
+  type: file
+
+online_store:
+  type: sqlite
+  path: data/online_store.db
+
+entity_key_serialization_version: 3

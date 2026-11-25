@@ -1,0 +1,27 @@
+# Slim dependency set for the serving container.
+#
+# Deliberately excludes Airflow, Kubeflow, DVC and the plotting stack.
+# Those belong to the training environment, not the API: shipping them
+# would roughly multiply the image size, slow every deploy and widen
+# the attack surface for no benefit.
+
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==17.0.0
+requests==2.32.3
+python-dotenv==1.0.1
+PyYAML==6.0.2
+
+scikit-learn==1.5.2
+xgboost==2.1.1
+lightgbm==4.5.0
+joblib==1.4.2
+
+Flask==3.0.3
+flask-cors==5.0.0
+gunicorn==23.0.0
+prometheus-flask-exporter==0.23.1
+prometheus-client==0.21.0
+
+# Needed only when MODEL_SOURCE=registry
+mlflow-skinny==2.17.0

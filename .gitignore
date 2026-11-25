@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────
+# SECRETS — never commit these. This repo is PUBLIC.
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*
+secrets*
+*_secret*
+*token*
+!**/tokenizer*
+.aws/
+.oci/
+config.local.*
+.dvc/config.local
+.dvc/tmp
+.dvc/cache
+
+# ─────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtual envs (we use conda, but just in case)
+.venv/
+venv/
+env/
+
+# ─────────────────────────────────────────────────────────────
+# Data — tracked by DVC, never by Git
+# ─────────────────────────────────────────────────────────────
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/**/*.dvc
+# data/reference/ IS committed (small CSV city list)
+
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.db
+*.sqlite
+*.sqlite3
+
+# ─────────────────────────────────────────────────────────────
+# Models & artifacts
+# ─────────────────────────────────────────────────────────────
+models/
+*.pkl
+*.joblib
+*.onnx
+*.pt
+*.pth
+mlruns/
+mlartifacts/
+.mlflow/
+bentoml/
+
+# ─────────────────────────────────────────────────────────────
+# Reports (generated)
+# ─────────────────────────────────────────────────────────────
+reports/*
+!reports/.gitkeep
+!reports/*.md
+
+# ─────────────────────────────────────────────────────────────
+# Feature store (generated state)
+# ─────────────────────────────────────────────────────────────
+feature_store/feature_repo/data/
+feature_store/**/registry.db
+feature_store/**/online_store.db
+
+# ─────────────────────────────────────────────────────────────
+# Frontend
+# ─────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+*.local
+
+# ─────────────────────────────────────────────────────────────
+# Airflow
+# ─────────────────────────────────────────────────────────────
+pipelines/airflow/logs/
+airflow.db
+airflow.cfg
+webserver_config.py
+standalone_admin_password.txt
+
+# ─────────────────────────────────────────────────────────────
+# OS / editor
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*~

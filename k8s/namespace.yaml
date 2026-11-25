@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airwatch
+  labels:
+    name: airwatch
+    project: pakistan-airwatch-ai

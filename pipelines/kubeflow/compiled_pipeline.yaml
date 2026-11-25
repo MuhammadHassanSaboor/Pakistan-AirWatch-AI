@@ -1,0 +1,763 @@
+# PIPELINE DEFINITION
+# Name: pm25-training-pipeline
+# Description: Pakistan AirWatch AI — validate, engineer, train, gate, register
+# Inputs:
+#    learning_rate: float [Default: 0.05]
+#    mae_threshold: float [Default: 25.0]
+#    max_depth: int [Default: 8.0]
+#    min_improvement_pct: float [Default: 15.0]
+#    n_estimators: int [Default: 400.0]
+#    raw_uri: str [Default: 'gs://airwatch/airquality_hourly.parquet']
+#    tracking_uri: str [Default: '']
+# Outputs:
+#    engineer-features-stats: system.Metrics
+#    evaluate-model-metrics: system.Metrics
+#    train-model-metrics: system.Metrics
+#    validate-data-report: system.Metrics
+components:
+  comp-condition-1:
+    dag:
+      outputs:
+        artifacts:
+          engineer-features-stats:
+            artifactSelectors:
+            - outputArtifactKey: stats
+              producerSubtask: engineer-features
+          evaluate-model-metrics:
+            artifactSelectors:
+            - outputArtifactKey: metrics
+              producerSubtask: evaluate-model
+          train-model-metrics:
+            artifactSelectors:
+            - outputArtifactKey: metrics
+              producerSubtask: train-model
+      tasks:
+        condition-2:
+          componentRef:
+            name: comp-condition-2
+          dependentTasks:
+          - evaluate-model
+          - train-model
+          inputs:
+            artifacts:
+              pipelinechannel--train-model-model:
+                taskOutputArtifact:
+                  outputArtifactKey: model
+                  producerTask: train-model
+            parameters:
+              pipelinechannel--evaluate-model-Output:
+                taskOutputParameter:
+                  outputParameterKey: Output
+                  producerTask: evaluate-model
+              pipelinechannel--tracking_uri:
+                componentInputParameter: pipelinechannel--tracking_uri
+              pipelinechannel--validate-data-Output:
+                componentInputParameter: pipelinechannel--validate-data-Output
+          taskInfo:
+            name: passes-quality-gate
+          triggerPolicy:
+            condition: inputs.parameter_values['pipelinechannel--evaluate-model-Output']
+              == true
+        engineer-features:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-engineer-features
+          inputs:
+            artifacts:
+              raw_dataset:
+                componentInputArtifact: pipelinechannel--importer-artifact
+          taskInfo:
+            name: engineer-features
+        evaluate-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-evaluate-model
+          dependentTasks:
+          - engineer-features
+          - train-model
+          inputs:
+            artifacts:
+              model:
+                taskOutputArtifact:
+                  outputArtifactKey: model
+                  producerTask: train-model
+              test_set:
+                taskOutputArtifact:
+                  outputArtifactKey: test_set
+                  producerTask: engineer-features
+            parameters:
+              mae_threshold:
+                componentInputParameter: pipelinechannel--mae_threshold
+              min_improvement_pct:
+                componentInputParameter: pipelinechannel--min_improvement_pct
+          taskInfo:
+            name: evaluate-model
+        train-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-train-model
+          dependentTasks:
+          - engineer-features
+          inputs:
+            artifacts:
+              train_set:
+                taskOutputArtifact:
+                  outputArtifactKey: train_set
+                  producerTask: engineer-features
+              val_set:
+                taskOutputArtifact:
+                  outputArtifactKey: val_set
+                  producerTask: engineer-features
+            parameters:
+              learning_rate:
+                componentInputParameter: pipelinechannel--learning_rate
+              max_depth:
+                componentInputParameter: pipelinechannel--max_depth
+              n_estimators:
+                componentInputParameter: pipelinechannel--n_estimators
+          taskInfo:
+            name: train-model
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--importer-artifact:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--learning_rate:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--mae_threshold:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--max_depth:
+          parameterType: NUMBER_INTEGER
+        pipelinechannel--min_improvement_pct:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--n_estimators:
+          parameterType: NUMBER_INTEGER
+        pipelinechannel--tracking_uri:
+          parameterType: STRING
+        pipelinechannel--validate-data-Output:
+          parameterType: BOOLEAN
+    outputDefinitions:
+      artifacts:
+        engineer-features-stats:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        evaluate-model-metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        train-model-metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-condition-2:
+    dag:
+      tasks:
+        register-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-register-model
+          inputs:
+            artifacts:
+              model:
+                componentInputArtifact: pipelinechannel--train-model-model
+            parameters:
+              stage:
+                runtimeValue:
+                  constant: Staging
+              tracking_uri:
+                componentInputParameter: pipelinechannel--tracking_uri
+          taskInfo:
+            name: register-model
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--train-model-model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--evaluate-model-Output:
+          parameterType: BOOLEAN
+        pipelinechannel--tracking_uri:
+          parameterType: STRING
+        pipelinechannel--validate-data-Output:
+          parameterType: BOOLEAN
+  comp-engineer-features:
+    executorLabel: exec-engineer-features
+    inputDefinitions:
+      artifacts:
+        raw_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        horizons:
+          defaultValue: 1,6,12,24
+          isOptional: true
+          parameterType: STRING
+        train_end:
+          defaultValue: '2025-05-31T23:00:00Z'
+          isOptional: true
+          parameterType: STRING
+        val_end:
+          defaultValue: '2025-12-31T23:00:00Z'
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        stats:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        test_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        train_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        val_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        test_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        mae_threshold:
+          defaultValue: 25.0
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        min_improvement_pct:
+          defaultValue: 15.0
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+  comp-importer:
+    executorLabel: exec-importer
+    inputDefinitions:
+      parameters:
+        uri:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        artifact:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-register-model:
+    executorLabel: exec-register-model
+    inputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        model_name:
+          defaultValue: pm25-forecaster
+          isOptional: true
+          parameterType: STRING
+        stage:
+          defaultValue: Staging
+          isOptional: true
+          parameterType: STRING
+        tracking_uri:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        train_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        val_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        learning_rate:
+          defaultValue: 0.05
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        max_depth:
+          defaultValue: 8.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        n_estimators:
+          defaultValue: 400.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-validate-data:
+    executorLabel: exec-validate-data
+    inputDefinitions:
+      artifacts:
+        raw_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        min_rows:
+          defaultValue: 10000.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        report:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+deploymentSpec:
+  executors:
+    exec-engineer-features:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - engineer_features
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.2.3'\
+          \ 'pyarrow==17.0.0' 'numpy==1.26.4' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef engineer_features(\n    raw_dataset: Input[Dataset],\n    train_set:\
+          \ Output[Dataset],\n    val_set: Output[Dataset],\n    test_set: Output[Dataset],\n\
+          \    stats: Output[Metrics],\n    train_end: str = \"2025-05-31T23:00:00Z\"\
+          ,\n    val_end: str = \"2025-12-31T23:00:00Z\",\n    horizons: str = \"\
+          1,6,12,24\",\n):\n    \"\"\"Lags, calendar and weather features, then a\
+          \ chronological split.\"\"\"\n    import numpy as np\n    import pandas\
+          \ as pd\n\n    df = pd.read_parquet(raw_dataset.path)\n    df[\"timestamp\"\
+          ] = pd.to_datetime(df[\"timestamp\"], utc=True)\n    df = df.sort_values([\"\
+          city_id\", \"timestamp\"]).reset_index(drop=True)\n\n    # Calendar\n  \
+          \  ts = df[\"timestamp\"]\n    df[\"hour\"] = ts.dt.hour\n    df[\"day_of_week\"\
+          ] = ts.dt.dayofweek\n    df[\"month\"] = ts.dt.month\n    df[\"hour_sin\"\
+          ] = np.sin(2 * np.pi * df[\"hour\"] / 24)\n    df[\"hour_cos\"] = np.cos(2\
+          \ * np.pi * df[\"hour\"] / 24)\n    df[\"month_sin\"] = np.sin(2 * np.pi\
+          \ * df[\"month\"] / 12)\n    df[\"month_cos\"] = np.cos(2 * np.pi * df[\"\
+          month\"] / 12)\n    df[\"is_smog_season\"] = df[\"month\"].isin([10, 11,\
+          \ 12, 1]).astype(int)\n\n    # Lags \u2014 past information only.\n    grouped\
+          \ = df.groupby(\"city_id\", sort=False)[\"pm2_5\"]\n    for lag in (1, 3,\
+          \ 6, 12, 24, 48, 168):\n        df[f\"pm2_5_lag_{lag}h\"] = grouped.shift(lag)\n\
+          \    shifted = grouped.shift(1)\n    for window in (6, 24, 72):\n      \
+          \  df[f\"pm2_5_roll{window}_mean\"] = (\n            shifted.groupby(df[\"\
+          city_id\"], sort=False)\n            .rolling(window, min_periods=1)\n \
+          \           .mean()\n            .reset_index(level=0, drop=True)\n    \
+          \    )\n\n    if {\"wind_speed_10m\", \"boundary_layer_height\"} <= set(df.columns):\n\
+          \        df[\"ventilation_index\"] = df[\"wind_speed_10m\"] * df[\n    \
+          \        \"boundary_layer_height\"\n        ].fillna(500)\n\n    # Supervised\
+          \ reshape\n    frames = []\n    for h in [int(x) for x in horizons.split(\"\
+          ,\")]:\n        part = df.copy()\n        part[\"horizon\"] = h\n      \
+          \  part[\"y\"] = part.groupby(\"city_id\", sort=False)[\"pm2_5\"].shift(-h)\n\
+          \        frames.append(part)\n    out = pd.concat(frames, ignore_index=True).dropna(subset=[\"\
+          y\"])\n    out = out.dropna(subset=[\"pm2_5_lag_1h\"])\n\n    # Chronological\
+          \ split\n    stamps = pd.to_datetime(out[\"timestamp\"], utc=True)\n   \
+          \ train = out[stamps <= pd.Timestamp(train_end)]\n    val = out[\n     \
+          \   (stamps > pd.Timestamp(train_end)) & (stamps <= pd.Timestamp(val_end))\n\
+          \    ]\n    test = out[stamps > pd.Timestamp(val_end)]\n\n    train.to_parquet(train_set.path,\
+          \ index=False)\n    val.to_parquet(val_set.path, index=False)\n    test.to_parquet(test_set.path,\
+          \ index=False)\n\n    stats.log_metric(\"train_rows\", float(len(train)))\n\
+          \    stats.log_metric(\"val_rows\", float(len(val)))\n    stats.log_metric(\"\
+          test_rows\", float(len(test)))\n    print(f\"train={len(train):,} val={len(val):,}\
+          \ test={len(test):,}\")\n\n"
+        image: python:3.11-slim
+        resources:
+          cpuLimit: 2.0
+          memoryLimit: 8.0
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.2.3'\
+          \ 'pyarrow==17.0.0' 'numpy==1.26.4' 'scikit-learn==1.5.2' 'xgboost==2.1.1'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(\n    model: Input[Model],\n    test_set: Input[Dataset],\n\
+          \    metrics: Output[Metrics],\n    mae_threshold: float = 25.0,\n    min_improvement_pct:\
+          \ float = 15.0,\n) -> bool:\n    \"\"\"Score on the held-out test set and\
+          \ apply the gate.\n\n    Returns False when the candidate is not good enough.\
+          \ The pipeline\n    uses that to skip registration entirely.\n    \"\"\"\
+          \n    import json\n\n    import numpy as np\n    import pandas as pd\n \
+          \   import xgboost as xgb\n    from sklearn.metrics import mean_absolute_error,\
+          \ mean_squared_error, r2_score\n\n    test = pd.read_parquet(test_set.path)\n\
+          \    with open(f\"{model.path}.features.json\") as handle:\n        features\
+          \ = json.load(handle)\n\n    estimator = xgb.XGBRegressor()\n    estimator.load_model(f\"\
+          {model.path}.json\")\n\n    predictions = np.clip(estimator.predict(test[features]),\
+          \ 0, None)\n\n    mae = float(mean_absolute_error(test[\"y\"], predictions))\n\
+          \    rmse = float(np.sqrt(mean_squared_error(test[\"y\"], predictions)))\n\
+          \    r2 = float(r2_score(test[\"y\"], predictions))\n\n    baseline = test[\"\
+          pm2_5_lag_1h\"].fillna(test[\"y\"].median())\n    baseline_mae = float(mean_absolute_error(test[\"\
+          y\"], baseline))\n    improvement = 100.0 * (baseline_mae - mae) / baseline_mae\n\
+          \n    metrics.log_metric(\"test_mae\", mae)\n    metrics.log_metric(\"test_rmse\"\
+          , rmse)\n    metrics.log_metric(\"test_r2\", r2)\n    metrics.log_metric(\"\
+          baseline_mae\", baseline_mae)\n    metrics.log_metric(\"improvement_pct\"\
+          , improvement)\n\n    for horizon in sorted(test[\"horizon\"].unique()):\n\
+          \        mask = (test[\"horizon\"] == horizon).to_numpy()\n        metrics.log_metric(\n\
+          \            f\"mae_h{int(horizon)}\",\n            float(mean_absolute_error(test.loc[mask,\
+          \ \"y\"], predictions[mask])),\n        )\n\n    passed = mae <= mae_threshold\
+          \ and improvement >= min_improvement_pct\n    metrics.log_metric(\"quality_gate_passed\"\
+          , 1.0 if passed else 0.0)\n\n    print(f\"test MAE  : {mae:.3f} (limit {mae_threshold})\"\
+          )\n    print(f\"baseline  : {baseline_mae:.3f}\")\n    print(f\"improvement:\
+          \ {improvement:.1f}% (minimum {min_improvement_pct}%)\")\n    print(f\"\
+          QUALITY GATE: {'PASS' if passed else 'FAIL'}\")\n    return passed\n\n"
+        image: python:3.11-slim
+        resources:
+          cpuLimit: 2.0
+          memoryLimit: 4.0
+    exec-importer:
+      importer:
+        artifactUri:
+          runtimeParameter: uri
+        typeSchema:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+    exec-register-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'mlflow-skinny==2.17.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_model(\n    model: Input[Model],\n    model_name: str\
+          \ = \"pm25-forecaster\",\n    stage: str = \"Staging\",\n    tracking_uri:\
+          \ str = \"\",\n):\n    \"\"\"Register the approved candidate. Only reachable\
+          \ via the gate.\"\"\"\n    print(f\"Registering {model_name} from {model.path}\
+          \ into stage={stage}\")\n    if not tracking_uri:\n        print(\"No tracking\
+          \ URI supplied; registration is a no-op in this run.\")\n        return\n\
+          \    import mlflow\n\n    mlflow.set_tracking_uri(tracking_uri)\n    print(f\"\
+          Would register against {tracking_uri}\")\n\n"
+        image: python:3.11-slim
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.2.3'\
+          \ 'pyarrow==17.0.0' 'numpy==1.26.4' 'scikit-learn==1.5.2' 'xgboost==2.1.1'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(\n    train_set: Input[Dataset],\n    val_set: Input[Dataset],\n\
+          \    model: Output[Model],\n    metrics: Output[Metrics],\n    max_depth:\
+          \ int = 8,\n    learning_rate: float = 0.05,\n    n_estimators: int = 400,\n\
+          ):\n    \"\"\"Train XGBoost with early stopping on the validation split.\"\
+          \"\"\n    import json\n    import time\n\n    import pandas as pd\n    import\
+          \ xgboost as xgb\n    from sklearn.metrics import mean_absolute_error\n\n\
+          \    train = pd.read_parquet(train_set.path)\n    val = pd.read_parquet(val_set.path)\n\
+          \n    exclude = {\"y\", \"timestamp\", \"city_id\", \"city_name\", \"province\"\
+          ,\n               \"data_source\", \"ingested_at\", \"valid_time\"}\n  \
+          \  features = [\n        c\n        for c in train.columns\n        if c\
+          \ not in exclude and pd.api.types.is_numeric_dtype(train[c])\n    ]\n\n\
+          \    estimator = xgb.XGBRegressor(\n        objective=\"reg:absoluteerror\"\
+          ,\n        tree_method=\"hist\",\n        max_depth=max_depth,\n       \
+          \ learning_rate=learning_rate,\n        n_estimators=n_estimators,\n   \
+          \     subsample=0.8,\n        colsample_bytree=0.8,\n        early_stopping_rounds=50,\n\
+          \        random_state=42,\n    )\n\n    started = time.time()\n    estimator.fit(\n\
+          \        train[features],\n        train[\"y\"],\n        eval_set=[(val[features],\
+          \ val[\"y\"])],\n        verbose=False,\n    )\n    elapsed = time.time()\
+          \ - started\n\n    val_mae = mean_absolute_error(val[\"y\"], estimator.predict(val[features]))\n\
+          \n    estimator.save_model(f\"{model.path}.json\")\n    with open(f\"{model.path}.features.json\"\
+          , \"w\") as handle:\n        json.dump(features, handle)\n\n    metrics.log_metric(\"\
+          val_mae\", float(val_mae))\n    metrics.log_metric(\"train_seconds\", float(elapsed))\n\
+          \    metrics.log_metric(\"n_features\", float(len(features)))\n    print(f\"\
+          val MAE={val_mae:.3f} in {elapsed:.1f}s over {len(features)} features\"\
+          )\n\n"
+        image: python:3.11-slim
+        resources:
+          cpuLimit: 4.0
+          memoryLimit: 8.0
+    exec-validate-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - validate_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.9.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas==2.2.3'\
+          \ 'pyarrow==17.0.0' 'numpy==1.26.4' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef validate_data(\n    raw_dataset: Input[Dataset],\n    report:\
+          \ Output[Metrics],\n    min_rows: int = 10000,\n) -> bool:\n    \"\"\"Schema\
+          \ and completeness checks. Returns False to halt the graph.\"\"\"\n    import\
+          \ pandas as pd\n\n    df = pd.read_parquet(raw_dataset.path)\n\n    checks\
+          \ = {\n        \"has_minimum_rows\": len(df) >= min_rows,\n        \"has_target\"\
+          : \"pm2_5\" in df.columns,\n        \"no_duplicate_keys\": not df.duplicated([\"\
+          city_id\", \"timestamp\"]).any(),\n        \"target_mostly_present\": df[\"\
+          pm2_5\"].isna().mean() < 0.30\n        if \"pm2_5\" in df.columns\n    \
+          \    else False,\n        \"coords_in_pakistan\": bool(\n            df[\"\
+          latitude\"].between(23.0, 37.5).all()\n            and df[\"longitude\"\
+          ].between(60.0, 78.0).all()\n        )\n        if {\"latitude\", \"longitude\"\
+          } <= set(df.columns)\n        else False,\n    }\n\n    for name, passed\
+          \ in checks.items():\n        report.log_metric(name, 1.0 if passed else\
+          \ 0.0)\n    report.log_metric(\"rows\", float(len(df)))\n    report.log_metric(\"\
+          cities\", float(df[\"city_id\"].nunique()))\n\n    ok = all(checks.values())\n\
+          \    print(f\"Validation checks: {checks}\")\n    print(f\"Overall: {'PASS'\
+          \ if ok else 'FAIL'}\")\n    return ok\n\n"
+        image: python:3.11-slim
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 2.0
+pipelineInfo:
+  description: "Pakistan AirWatch AI \u2014 validate, engineer, train, gate, register"
+  name: pm25-training-pipeline
+root:
+  dag:
+    outputs:
+      artifacts:
+        engineer-features-stats:
+          artifactSelectors:
+          - outputArtifactKey: engineer-features-stats
+            producerSubtask: condition-1
+        evaluate-model-metrics:
+          artifactSelectors:
+          - outputArtifactKey: evaluate-model-metrics
+            producerSubtask: condition-1
+        train-model-metrics:
+          artifactSelectors:
+          - outputArtifactKey: train-model-metrics
+            producerSubtask: condition-1
+        validate-data-report:
+          artifactSelectors:
+          - outputArtifactKey: report
+            producerSubtask: validate-data
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - importer
+        - validate-data
+        inputs:
+          artifacts:
+            pipelinechannel--importer-artifact:
+              taskOutputArtifact:
+                outputArtifactKey: artifact
+                producerTask: importer
+          parameters:
+            pipelinechannel--learning_rate:
+              componentInputParameter: learning_rate
+            pipelinechannel--mae_threshold:
+              componentInputParameter: mae_threshold
+            pipelinechannel--max_depth:
+              componentInputParameter: max_depth
+            pipelinechannel--min_improvement_pct:
+              componentInputParameter: min_improvement_pct
+            pipelinechannel--n_estimators:
+              componentInputParameter: n_estimators
+            pipelinechannel--tracking_uri:
+              componentInputParameter: tracking_uri
+            pipelinechannel--validate-data-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: validate-data
+        taskInfo:
+          name: data-is-valid
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--validate-data-Output']
+            == true
+      importer:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-importer
+        inputs:
+          parameters:
+            uri:
+              componentInputParameter: raw_uri
+        taskInfo:
+          name: importer
+      validate-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-validate-data
+        dependentTasks:
+        - importer
+        inputs:
+          artifacts:
+            raw_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: artifact
+                producerTask: importer
+        taskInfo:
+          name: validate-data
+  inputDefinitions:
+    parameters:
+      learning_rate:
+        defaultValue: 0.05
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      mae_threshold:
+        defaultValue: 25.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      max_depth:
+        defaultValue: 8.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      min_improvement_pct:
+        defaultValue: 15.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      n_estimators:
+        defaultValue: 400.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      raw_uri:
+        defaultValue: gs://airwatch/airquality_hourly.parquet
+        isOptional: true
+        parameterType: STRING
+      tracking_uri:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      engineer-features-stats:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      evaluate-model-metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      train-model-metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      validate-data-report:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.9.0

@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+# Pakistan AirWatch AI — development requirements (Python 3.11)
+#
+#   conda activate airwatch
+#   pip install -r requirements.txt
+#
+# Airflow, Kubeflow and Feast are installed separately
+# (see requirements-pipelines.txt) because they pull heavy,
+# conflicting dependency trees.
+# ═══════════════════════════════════════════════════════════════
+
+# ── Core data ─────────────────────────────────────────────────
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==17.0.0
+requests==2.32.3
+python-dotenv==1.0.1
+PyYAML==6.0.2
+tenacity==9.0.0
+tqdm==4.66.5
+
+# ── Data validation ───────────────────────────────────────────
+pandera==0.20.4
+
+# ── Machine learning ──────────────────────────────────────────
+scikit-learn==1.5.2
+xgboost==2.1.1
+lightgbm==4.5.0
+scipy==1.14.1
+joblib==1.4.2
+matplotlib==3.9.2
+
+# ── Experiment tracking ───────────────────────────────────────
+mlflow==2.17.0
+dvc==3.55.2
+dvc-s3==3.2.0
+
+# ── Serving ───────────────────────────────────────────────────
+Flask==3.0.3
+flask-cors==5.0.0
+gunicorn==23.0.0
+waitress==3.0.0
+prometheus-flask-exporter==0.23.1
+prometheus-client==0.21.0
+
+# ── Database ──────────────────────────────────────────────────
+SQLAlchemy==2.0.35
+psycopg2-binary==2.9.9
+
+# ── Monitoring / drift ────────────────────────────────────────
+evidently==0.4.40
+
+# ── Testing & quality ─────────────────────────────────────────
+pytest==8.3.3
+pytest-cov==5.0.0
+ruff==0.6.9
+pre-commit==4.0.1
+pip-audit==2.7.3

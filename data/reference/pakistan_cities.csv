@@ -1,0 +1,135 @@
+city_id,city_name,province,latitude,longitude,population,elevation_m
+bagh,Bagh,Azad Jammu & Kashmir,33.9792,73.7722,40000,1006
+bhimber,Bhimber,Azad Jammu & Kashmir,32.9742,74.0789,48000,360
+kotli,Kotli,Azad Jammu & Kashmir,33.5181,73.9022,72000,610
+mirpur,Mirpur,Azad Jammu & Kashmir,33.1472,73.7519,124000,459
+muzaffarabad,Muzaffarabad,Azad Jammu & Kashmir,34.37,73.4711,150000,737
+rawalakot,Rawalakot,Azad Jammu & Kashmir,33.8578,73.7604,60000,1638
+chaman,Chaman,Balochistan,30.918,66.4518,134000,1326
+dalbandin,Dalbandin,Balochistan,28.8886,64.4061,35000,848
+dera_murad_jamali,Dera Murad Jamali,Balochistan,28.5486,68.2203,55000,50
+gandava,Gandava,Balochistan,28.6167,67.4833,42000,60
+gwadar,Gwadar,Balochistan,25.1264,62.3225,90000,9
+hub,Hub,Balochistan,25.0,66.9,110000,30
+kalat,Kalat,Balochistan,29.0264,66.5897,40000,2015
+khuzdar,Khuzdar,Balochistan,27.812,66.61,141000,1237
+loralai,Loralai,Balochistan,30.3705,68.5968,58000,1444
+mastung,Mastung,Balochistan,29.7994,66.8456,52000,1698
+nushki,Nushki,Balochistan,29.5503,66.0217,45000,1000
+pasni,Pasni,Balochistan,25.2631,63.4703,48000,6
+quetta,Quetta,Balochistan,30.1798,66.975,1001205,1680
+sibi,Sibi,Balochistan,29.543,67.8773,75000,133
+turbat,Turbat,Balochistan,26.0023,63.044,213557,142
+usta_mohammad,Usta Mohammad,Balochistan,28.1811,68.0433,47000,46
+zhob,Zhob,Balochistan,31.3417,69.4486,68000,1405
+astore,Astore,Gilgit-Baltistan,35.3667,74.85,25000,2600
+chilas,Chilas,Gilgit-Baltistan,35.4208,74.0994,35000,1265
+gilgit,Gilgit,Gilgit-Baltistan,35.9208,74.3083,216760,1500
+hunza,Hunza,Gilgit-Baltistan,36.3167,74.65,30000,2438
+skardu,Skardu,Gilgit-Baltistan,35.2971,75.6333,95000,2228
+islamabad,Islamabad,Islamabad,33.6844,73.0479,1014825,540
+abbottabad,Abbottabad,Khyber Pakhtunkhwa,34.1558,73.2194,148587,1256
+bannu,Bannu,Khyber Pakhtunkhwa,32.9889,70.6056,99000,367
+batkhela,Batkhela,Khyber Pakhtunkhwa,34.6181,71.9728,82000,686
+charsadda,Charsadda,Khyber Pakhtunkhwa,34.1453,71.7308,105414,276
+chitral,Chitral,Khyber Pakhtunkhwa,35.8518,71.7864,50000,1494
+dera_ismail_khan,Dera Ismail Khan,Khyber Pakhtunkhwa,31.8313,70.9019,217457,173
+dir,Dir,Khyber Pakhtunkhwa,35.2069,71.8761,45000,1425
+hangu,Hangu,Khyber Pakhtunkhwa,33.5331,71.0586,60000,873
+haripur,Haripur,Khyber Pakhtunkhwa,33.9947,72.9339,87000,520
+karak,Karak,Khyber Pakhtunkhwa,33.1167,71.0931,55000,666
+kohat,Kohat,Khyber Pakhtunkhwa,33.5869,71.4414,228779,489
+lakki_marwat,Lakki Marwat,Khyber Pakhtunkhwa,32.6075,70.9117,60000,290
+mansehra,Mansehra,Khyber Pakhtunkhwa,34.33,73.1968,98000,1088
+mardan,Mardan,Khyber Pakhtunkhwa,34.1989,72.04,358604,283
+mingora,Mingora,Khyber Pakhtunkhwa,34.7795,72.3614,331091,984
+nowshera,Nowshera,Khyber Pakhtunkhwa,34.0153,71.9747,118594,288
+parachinar,Parachinar,Khyber Pakhtunkhwa,33.8989,70.1011,62000,1726
+peshawar,Peshawar,Khyber Pakhtunkhwa,34.0151,71.5249,1970042,331
+saidu_sharif,Saidu Sharif,Khyber Pakhtunkhwa,34.75,72.3572,50000,961
+swabi,Swabi,Khyber Pakhtunkhwa,34.1203,72.47,111911,305
+tank,Tank,Khyber Pakhtunkhwa,32.2167,70.3833,48000,310
+timergara,Timergara,Khyber Pakhtunkhwa,34.8281,71.8428,78000,823
+abdul_hakim,Abdul Hakim,Punjab,30.5525,72.1278,150000,134
+arifwala,Arifwala,Punjab,30.2914,73.0656,85000,155
+attock,Attock,Punjab,33.7667,72.3667,114000,350
+bahawalnagar,Bahawalnagar,Punjab,29.9942,73.2536,134936,152
+bahawalpur,Bahawalpur,Punjab,29.3956,71.6836,762111,117
+bhakkar,Bhakkar,Punjab,31.626,71.0654,98000,168
+burewala,Burewala,Punjab,30.1667,72.65,231797,143
+chakwal,Chakwal,Punjab,32.9328,72.863,113524,498
+chiniot,Chiniot,Punjab,31.72,72.9789,278747,163
+chishtian,Chishtian,Punjab,29.7971,72.8578,101000,148
+daska,Daska,Punjab,32.3242,74.35,142586,239
+dera_ghazi_khan,Dera Ghazi Khan,Punjab,30.0489,70.6455,399064,128
+faisalabad,Faisalabad,Punjab,31.4504,73.135,3204726,186
+fort_abbas,Fort Abbas,Punjab,29.1933,72.8569,64000,143
+gojra,Gojra,Punjab,31.1489,72.6825,158586,174
+gujranwala,Gujranwala,Punjab,32.1877,74.1945,2027001,226
+gujrat,Gujrat,Punjab,32.5731,74.0789,390533,243
+hafizabad,Hafizabad,Punjab,32.0712,73.6895,245784,207
+hasilpur,Hasilpur,Punjab,29.6939,72.5461,87000,128
+jalalpur_jattan,Jalalpur Jattan,Punjab,32.6417,74.2056,80000,251
+jaranwala,Jaranwala,Punjab,31.3333,73.4167,116000,180
+jhang,Jhang,Punjab,31.2781,72.3317,414131,158
+jhelum,Jhelum,Punjab,32.9425,73.7257,190425,233
+kabirwala,Kabirwala,Punjab,30.4042,71.8697,83000,130
+kamoke,Kamoke,Punjab,31.9742,74.2239,249767,219
+kasur,Kasur,Punjab,31.1187,74.4504,358409,218
+khanewal,Khanewal,Punjab,30.3017,71.9321,227059,126
+khanpur,Khanpur,Punjab,28.6453,70.6567,170626,88
+kharian,Kharian,Punjab,32.8181,73.8814,78000,263
+kot_addu,Kot Addu,Punjab,30.4697,70.9644,110000,124
+kot_radha_kishan,Kot Radha Kishan,Punjab,31.1667,74.1,68000,208
+lahore,Lahore,Punjab,31.5204,74.3587,11126285,217
+layyah,Layyah,Punjab,30.9611,70.9428,106000,143
+lodhran,Lodhran,Punjab,29.5339,71.6336,95000,112
+mandi_bahauddin,Mandi Bahauddin,Punjab,32.5861,73.4917,157352,223
+mian_channu,Mian Channu,Punjab,30.4397,72.3544,82000,136
+mianwali,Mianwali,Punjab,32.5839,71.537,103000,210
+multan,Multan,Punjab,30.1575,71.5249,1871843,122
+murree,Murree,Punjab,33.907,73.3903,30000,2291
+muzaffargarh,Muzaffargarh,Punjab,30.0736,71.1805,182458,123
+nankana_sahib,Nankana Sahib,Punjab,31.4492,73.7067,121000,199
+narowal,Narowal,Punjab,32.1014,74.8731,92000,243
+okara,Okara,Punjab,30.8081,73.4458,357935,177
+pakpattan,Pakpattan,Punjab,30.3453,73.3906,139525,162
+pind_dadan_khan,Pind Dadan Khan,Punjab,32.5869,73.0497,70000,219
+rahim_yar_khan,Rahim Yar Khan,Punjab,28.4202,70.2952,420419,83
+rajanpur,Rajanpur,Punjab,29.1041,70.3302,88000,96
+rawalpindi,Rawalpindi,Punjab,33.5651,73.0169,2098231,508
+sadiqabad,Sadiqabad,Punjab,28.3091,70.13,239677,85
+sahiwal,Sahiwal,Punjab,30.6682,73.1114,389605,170
+sargodha,Sargodha,Punjab,32.0836,72.6711,659862,193
+shakargarh,Shakargarh,Punjab,32.2631,75.16,76000,265
+sheikhupura,Sheikhupura,Punjab,31.7131,73.9783,473129,214
+shorkot,Shorkot,Punjab,31.15,72.4167,66000,152
+sialkot,Sialkot,Punjab,32.4945,74.5229,655852,256
+talagang,Talagang,Punjab,32.9292,72.415,72000,460
+toba_tek_singh,Toba Tek Singh,Punjab,30.9709,72.4826,117629,166
+vehari,Vehari,Punjab,30.0442,72.3528,124019,139
+wah_cantonment,Wah Cantonment,Punjab,33.794,72.7461,380103,532
+badin,Badin,Sindh,24.6556,68.837,102000,8
+dadu,Dadu,Sindh,26.7319,67.7764,146179,32
+ghotki,Ghotki,Sindh,28.0042,69.3153,75000,65
+hyderabad,Hyderabad,Sindh,25.396,68.3578,1732693,13
+jacobabad,Jacobabad,Sindh,28.2769,68.4514,200815,56
+kandhkot,Kandhkot,Sindh,28.2558,69.1792,65000,58
+karachi,Karachi,Sindh,24.8607,67.0011,14910352,10
+kashmore,Kashmore,Sindh,28.4333,69.5833,62000,62
+khairpur,Khairpur,Sindh,27.5295,68.7592,150425,53
+larkana,Larkana,Sindh,27.56,68.2264,490508,46
+matiari,Matiari,Sindh,25.5969,68.4461,58000,18
+mirpur_khas,Mirpur Khas,Sindh,25.5276,69.0111,233916,19
+mithi,Mithi,Sindh,24.7333,69.8,45000,50
+nawabshah,Nawabshah,Sindh,26.2442,68.41,279688,36
+rohri,Rohri,Sindh,27.6947,68.8961,60000,57
+sanghar,Sanghar,Sindh,26.0464,68.9492,72000,29
+shahdadkot,Shahdadkot,Sindh,27.8475,67.9072,71000,42
+shikarpur,Shikarpur,Sindh,27.9556,68.6382,177682,52
+sujawal,Sujawal,Sindh,24.6031,68.075,52000,9
+sukkur,Sukkur,Sindh,27.7052,68.8574,499900,59
+tando_adam,Tando Adam,Sindh,25.7614,68.6628,152689,26
+tando_allahyar,Tando Allahyar,Sindh,25.4608,68.7192,133487,22
+thatta,Thatta,Sindh,24.7461,67.9239,60000,12
+umerkot,Umerkot,Sindh,25.3614,69.7361,68000,25

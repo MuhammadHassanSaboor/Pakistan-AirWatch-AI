@@ -1,0 +1,105 @@
+# ═══════════════════════════════════════════════════════════════
+# Data acquisition configuration
+#
+# Every number here was VERIFIED against the live APIs on
+# 2026-11-25.  See Documents/DATA_FEASIBILITY.md for the evidence.
+# ═══════════════════════════════════════════════════════════════
+
+project_name: pakistan-airwatch-ai
+
+# ── Geographic scope ──────────────────────────────────────────
+cities:
+  file: data/reference/pakistan_cities.csv
+  target_count: 130          # we ship 100+ as required
+  min_population: 20000
+  # Pakistan bounding box — used for sanity checks
+  bbox:
+    lat_min: 23.5
+    lat_max: 37.1
+    lon_min: 60.8
+    lon_max: 77.9
+
+# ── Time coverage ─────────────────────────────────────────────
+# IMPORTANT: Open-Meteo's air-quality archive ACCEPTS older dates
+# but returns all-null values before 2022-08-05. Verified by
+# binary search on 2026-11-25. Do not change `start` to an earlier
+# date expecting more data — you will only get nulls.
+time:
+  air_quality_start: "2022-08-05"   # earliest real CAMS data
+  weather_start: "2022-08-05"       # ERA5 goes to 1940 but is
+                                    # useless without AQ labels
+  timezone: UTC
+  frequency: hourly
+
+# ── Open-Meteo: air quality (NO API KEY REQUIRED) ─────────────
+openmeteo_air_quality:
+  archive_url: https://air-quality-api.open-meteo.com/v1/air-quality
+  live_url: https://air-quality-api.open-meteo.com/v1/air-quality
+  variables:
+    - pm2_5
+    - pm10
+    - carbon_monoxide
+    - nitrogen_dioxide
+    - sulphur_dioxide
+    - ozone
+    - dust
+    - aerosol_optical_depth
+    - uv_index
+  live:
+    past_days: 2
+    forecast_days: 3
+
+# ── Open-Meteo: weather (NO API KEY REQUIRED) ─────────────────
+openmeteo_weather:
+  archive_url: https://archive-api.open-meteo.com/v1/archive
+  forecast_url: https://api.open-meteo.com/v1/forecast
+  # Capped at 10 variables ON PURPOSE. Open-Meteo prices a request at
+  # roughly   locations x ceil(variables/10) x ceil(days/14),
+  # so the 11th variable DOUBLES the cost of every weather request.
+  # dew_point_2m and apparent_temperature were dropped: both are
+  # derivable from temperature + humidity, which we keep.
+  variables:
+    - temperature_2m
+    - relative_humidity_2m
+    - precipitation
+    - surface_pressure
+    - cloud_cover
+    - wind_speed_10m
+    - wind_direction_10m
+    - wind_gusts_10m
+    - boundary_layer_height
+    - shortwave_radiation
+
+# ── OpenAQ: OPTIONAL ground-truth validation ──────────────────
+# Leave the API key blank in .env and the pipeline skips this
+# source cleanly. The project works fully without it.
+openaq:
+  enabled: false
+  base_url: https://api.openaq.org/v3
+  country_iso: PK
+  max_distance_km: 25        # station-to-city matching radius
+
+# ── Politeness / rate limiting ────────────────────────────────
+# Open-Meteo's free tier is generous but not unlimited. These
+# settings keep us well inside fair use.
+fetch:
+  # Open-Meteo weights each request by
+  #   locations x days x variables
+  # Measured 2026-11-25: 20 cities x 1 year succeeded; 30 returned
+  # HTTP 429 ("minutely limit"). These values stay well under that.
+  batch_size: 12             # cities per request
+  chunk_months: 6            # months per request
+  sleep_seconds: 3.0         # pause between requests
+  max_retries: 8          # must survive several hourly quota windows
+  backoff_seconds: 65        # wait after an HTTP 429
+  timeout_seconds: 45        # fail fast and retry; hung sockets stall the run
+  resume: true               # skip city-chunks already downloaded
+
+# ── Output paths ──────────────────────────────────────────────
+paths:
+  raw_chunks: data/raw/chunks
+  raw_combined: data/raw/airquality_hourly.parquet
+  openaq_raw: data/raw/openaq_ground_truth.parquet
+  interim: data/interim
+  processed: data/processed/features.parquet
+  quality_report: reports/data_quality.json

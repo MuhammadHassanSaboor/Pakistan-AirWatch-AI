@@ -1,0 +1,87 @@
+# DVC pipeline: the reproducible path from raw data to an evaluated model.
+#
+#   dvc repro          run every stage whose inputs changed
+#   dvc dag            print the dependency graph
+#   dvc metrics show   current metrics
+#   dvc metrics diff   compare against another commit
+#
+# DVC decides what to re-run by hashing each stage's deps and params.
+# Editing preprocessing.py re-runs features/train/evaluate but does NOT
+# re-download the data.
+
+stages:
+
+  cities:
+    desc: Build the 134-city reference table
+    cmd: python -m src.data.cities
+    deps:
+      - src/data/cities.py
+    params:
+      - configs/data_config.yaml:
+          - cities
+    outs:
+      - data/reference/pakistan_cities.csv:
+          cache: false        # small and human-readable; keep it in Git
+
+  ingest:
+    desc: Download hourly air-quality and weather history from Open-Meteo
+    cmd: python -m src.data.ingestion
+    deps:
+      - src/data/ingestion.py
+      - src/data/openmeteo.py
+      - data/reference/pakistan_cities.csv
+    params:
+      - configs/data_config.yaml:
+          - time
+          - openmeteo_air_quality
+          - openmeteo_weather
+          - fetch
+    outs:
+      - data/raw/airquality_hourly.parquet
+
+  validate:
+    desc: Schema and data-quality gate on the raw dataset
+    cmd: python -m src.data.validation --strict
+    deps:
+      - src/data/validation.py
+      - data/raw/airquality_hourly.parquet
+    metrics:
+      - reports/data_quality.json:
+          cache: false
+
+  features:
+    desc: Build the supervised feature table
+    cmd: python -m src.features.build_features
+    deps:
+      - src/features/preprocessing.py
+      - src/features/build_features.py
+      - data/raw/airquality_hourly.parquet
+      - data/reference/pakistan_cities.csv
+    params:
+      - configs/model_params.yaml:
+          - target
+          - horizons
+          - features
+    outs:
+      - data/processed/features.parquet
+    metrics:
+      - reports/feature_summary.json:
+          cache: false
+
+  train:
+    desc: Train the primary model and log it to MLflow
+    cmd: python -m src.models.train_xgboost
+    deps:
+      - src/models/train_xgboost.py
+      - src/models/train_base.py
+      - src/models/evaluate.py
+      - src/features/splits.py
+      - data/processed/features.parquet
+    params:
+      - configs/model_params.yaml:
+          - xgboost
+          - split
+          - quality_gate
+    metrics:
+      - reports/train_metrics.json:
+          cache: false

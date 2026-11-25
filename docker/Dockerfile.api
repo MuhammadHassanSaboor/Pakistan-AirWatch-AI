@@ -1,0 +1,83 @@
+# ═══════════════════════════════════════════════════════════════
+# Pakistan AirWatch AI — Flask prediction API
+#
+# Multi-stage build:
+#   builder  compiles wheels (needs gcc)
+#   runtime  carries only the installed packages (no compiler)
+#
+# Security posture: runs as an unprivileged user with a read-only
+# root filesystem, carries no secrets, and bundles no datasets.
+# ═══════════════════════════════════════════════════════════════
+
+# ── stage 1: build ────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-api.txt .
+RUN pip install --prefix=/install -r requirements-api.txt
+
+
+# ── stage 2: runtime ──────────────────────────────────────────
+FROM python:3.11-slim AS runtime
+
+LABEL org.opencontainers.image.title="pakistan-airwatch-api" \
+      org.opencontainers.image.description="Hourly PM2.5 forecasting API" \
+      org.opencontainers.image.licenses="MIT"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    PIP_NO_CACHE_DIR=1
+
+# libgomp is required at runtime by XGBoost and LightGBM.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 appuser
+
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+
+# Only what the API actually needs. No tests, no notebooks, no data.
+COPY --chown=appuser:appuser src/__init__.py            src/__init__.py
+COPY --chown=appuser:appuser src/config.py              src/config.py
+COPY --chown=appuser:appuser src/data/__init__.py       src/data/__init__.py
+COPY --chown=appuser:appuser src/data/cities.py         src/data/cities.py
+COPY --chown=appuser:appuser src/data/openmeteo.py      src/data/openmeteo.py
+COPY --chown=appuser:appuser src/features/              src/features/
+COPY --chown=appuser:appuser src/serving/               src/serving/
+COPY --chown=appuser:appuser configs/                   configs/
+COPY --chown=appuser:appuser data/reference/            data/reference/
+
+# The model is mounted at runtime (or pulled from the registry) rather
+# than baked in, so promoting a new model needs no image rebuild.
+RUN mkdir -p /app/models/production && chown -R appuser:appuser /app/models
+
+USER appuser
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+    CMD curl -fsS http://localhost:5000/health || exit 1
+
+# Gunicorn, not `flask run`: the development server is single-threaded
+# and explicitly unsuitable for production.
+CMD ["gunicorn", \
+     "--bind", "0.0.0.0:5000", \
+     "--workers", "2", \
+     "--threads", "4", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info", \
+     "src.serving.app:app"]

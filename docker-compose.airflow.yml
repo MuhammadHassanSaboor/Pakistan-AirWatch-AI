@@ -1,0 +1,110 @@
+# Airflow stack — kept separate from docker-compose.yml on purpose.
+#
+# Airflow needs its own database, scheduler and webserver and several
+# GB of RAM. Folding it into the main stack would mean every
+# `docker compose up` for a simple API change started four extra
+# services.
+#
+#   docker compose -f docker-compose.airflow.yml up airflow-init   # once
+#   docker compose -f docker-compose.airflow.yml up -d
+#   open http://localhost:8080   (airflow / airflow)
+#
+#   docker compose -f docker-compose.airflow.yml down -v           # teardown
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.2-python3.11
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # The DAGs import from src/, so the project must be importable.
+    PYTHONPATH: /opt/airflow/project
+    # Passed through so DAG tasks can reach DagsHub. Empty is fine:
+    # the tracking helper falls back to a local store.
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+    MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
+    MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
+    AIRWATCH_MEMBER: ${AIRWATCH_MEMBER:-mudassar}
+    _PIP_ADDITIONAL_REQUIREMENTS: >-
+      pandas==2.2.3 pyarrow==17.0.0 numpy==1.26.4 pandera==0.20.4
+      scikit-learn==1.5.2 xgboost==2.1.1 mlflow==2.17.0
+      evidently==0.4.40 requests==2.32.3 python-dotenv==1.0.1
+  volumes:
+    - ./pipelines/airflow/dags:/opt/airflow/dags:ro
+    - ./pipelines/airflow/logs:/opt/airflow/logs
+    - ./pipelines/airflow/plugins:/opt/airflow/plugins:ro
+    # The whole project, so DAG tasks can import src.* and read configs
+    # and data. Read-write because tasks write to data/interim/.
+    - ./:/opt/airflow/project
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+  # Lets a DAG reach the Flask API and the Kubeflow UI on the host.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+
+  airflow-db:
+    image: postgres:16-alpine
+    container_name: airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username airflow --password airflow \
+          --firstname AirWatch --lastname Team \
+          --role Admin --email team@airwatch.local || true
+        echo "Airflow initialised. Now run: docker compose -f docker-compose.airflow.yml up -d"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  airflow-db-data:

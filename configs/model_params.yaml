@@ -1,0 +1,119 @@
+# ═══════════════════════════════════════════════════════════════
+# Modelling configuration
+#
+# ⚠️  ALL THREE TEAM MEMBERS READ THIS FILE.
+#     Nobody hard-codes split dates or metric names anywhere else.
+#     If these differ between members, our MLflow comparison is
+#     meaningless.
+# ═══════════════════════════════════════════════════════════════
+
+target: pm2_5
+target_unit: "ug/m3"
+
+# How many hours ahead we forecast.
+# `horizon` is a FEATURE, so one model serves all four.
+horizons: [1, 6, 12, 24]
+
+# ── Chronological split (NEVER random — this is time series) ──
+# Data runs 2022-08-05 -> today.
+#   train: 2.8 years, includes smog seasons 22/23, 23/24, 24/25
+#   val:   7 months
+#   test:  most recent ~11 months, includes a full smog season
+split:
+  train_end: "2025-05-31T23:00:00Z"
+  val_end:   "2025-12-31T23:00:00Z"
+
+# ── Feature engineering ───────────────────────────────────────
+features:
+  lags: [1, 2, 3, 6, 12, 24, 48, 72, 168]
+  rolling_windows: [3, 6, 12, 24, 72]
+  n_spatial_neighbours: 3
+  # Columns never fed to the model
+  exclude:
+    - y
+    - timestamp
+    - city_id
+    - city_name
+    - province
+    - ingested_at
+    - data_source
+
+# ── Quality gate ──────────────────────────────────────────────
+# A model that fails EITHER of these must not reach production.
+# Enforced in src/models/evaluate.py, tests/test_model.py,
+# the Airflow retraining DAG and the Kubeflow pipeline.
+quality_gate:
+  max_test_mae: 25.0
+  min_improvement_over_baseline_pct: 15.0
+  # A candidate must beat the CURRENT production model by this
+  # much before it is promoted. Stops pointless redeployments.
+  min_improvement_over_production_pct: 2.0
+
+# ── Metric names — frozen, do not rename ──────────────────────
+metrics:
+  primary: test_mae
+  tiebreaker: mae_h24
+  required:
+    - val_mae
+    - val_rmse
+    - val_r2
+    - test_mae
+    - test_rmse
+    - test_r2
+    - mae_h1
+    - mae_h6
+    - mae_h12
+    - mae_h24
+    - baseline_mae
+    - improvement_pct
+    - train_seconds
+
+# ── Model hyperparameters ─────────────────────────────────────
+
+baseline:
+  methods: [persistence, seasonal_naive, rolling_mean]
+
+ridge:
+  alpha: 1.0
+
+random_forest:
+  n_estimators: 200
+  max_depth: 18
+  min_samples_leaf: 5
+  n_jobs: -1
+  random_state: 42
+
+xgboost:
+  objective: "reg:absoluteerror"
+  tree_method: hist
+  max_depth: 8
+  learning_rate: 0.05
+  n_estimators: 600
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 5
+  reg_lambda: 1.0
+  early_stopping_rounds: 50
+  random_state: 42
+  n_jobs: -1
+
+lightgbm:
+  objective: regression_l1
+  num_leaves: 64
+  learning_rate: 0.05
+  n_estimators: 800
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_samples: 20
+  reg_lambda: 1.0
+  random_state: 42
+  n_jobs: -1
+
+# ── Model registry ────────────────────────────────────────────
+registry:
+  model_name: pm25-forecaster
+  staging_stage: Staging
+  production_stage: Production
+
+# ── Reproducibility ───────────────────────────────────────────
+random_seed: 42

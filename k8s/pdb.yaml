@@ -1,0 +1,12 @@
+# Pod Disruption Budget: keeps the service available during voluntary
+# disruptions such as a node drain or a rolling node upgrade.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airwatch-api-pdb
+  namespace: airwatch
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: airwatch-api

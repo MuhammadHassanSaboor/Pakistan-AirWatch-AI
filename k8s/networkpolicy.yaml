@@ -1,0 +1,28 @@
+# Least-privilege networking.
+#
+# Without a NetworkPolicy every pod in the cluster can reach every
+# other pod. This restricts ingress to the API port and allows egress
+# only for DNS and HTTPS (needed for Open-Meteo and MLflow).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: airwatch-api-netpol
+  namespace: airwatch
+spec:
+  podSelector:
+    matchLabels:
+      app: airwatch-api
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 5000
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 443

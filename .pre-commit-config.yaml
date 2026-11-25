@@ -1,0 +1,52 @@
+# Runs before every commit:  pre-commit install
+#
+# The secret-detection hooks matter most here. This repository is
+# public, so a single committed token is a real incident. These hooks
+# stop one reaching GitHub in the first place.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1000]          # data belongs in DVC, not Git
+      - id: check-merge-conflict
+      - id: detect-private-key        # SSH / TLS keys
+      - id: no-commit-to-branch
+        args: [--branch, main]        # force the PR workflow
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks               # API keys, tokens, credentials
+
+  - repo: local
+    hooks:
+      - id: no-env-file
+        name: block committing .env
+        entry: .env must never be committed; use .env.example
+        language: fail
+        files: '^\.env$|^\.env\..*(?<!example)$'
+
+      - id: no-data-files
+        name: block committing datasets
+        entry: datasets belong in DVC; run 'dvc add' instead of 'git add'
+        language: fail
+        files: '\.(parquet|csv|pkl|joblib)$'
+        exclude: '^data/reference/|^tests/fixtures/'

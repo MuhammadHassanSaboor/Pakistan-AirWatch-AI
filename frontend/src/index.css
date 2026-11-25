@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 text-ink-100 font-sans antialiased;
+    /* A faint two-point glow keeps a flat dark page from looking dead. */
+    background-image:
+      radial-gradient(
+        900px 500px at 12% -8%,
+        rgba(20, 184, 166, 0.09),
+        transparent 60%
+      ),
+      radial-gradient(
+        800px 460px at 92% 4%,
+        rgba(56, 130, 246, 0.07),
+        transparent 62%
+      );
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-600;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-ink-950;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-900/70 shadow-panel backdrop-blur-xl;
+  }
+
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3.5;
+  }
+
+  .panel-title {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10
+           bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-ink-300;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-white/10
+           bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-ink-200
+           transition-all duration-200 hover:border-white/20 hover:bg-white/[0.08]
+           active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-accent {
+    @apply border-accent/40 bg-accent/15 text-accent-soft hover:border-accent/60 hover:bg-accent/25;
+  }
+
+  .stat-value {
+    @apply font-mono text-3xl font-semibold tracking-tight tabular-nums;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-white/[0.05];
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.07),
+      transparent
+    );
+  }
+}
+
+/* ── Leaflet overrides: the default theme is bright and dated ── */
+.leaflet-container {
+  @apply bg-ink-950 font-sans;
+  outline: none;
+}
+
+.leaflet-control-zoom a {
+  @apply !border-white/10 !bg-ink-800/90 !text-ink-200 !backdrop-blur;
+}
+.leaflet-control-zoom a:hover {
+  @apply !bg-ink-700 !text-white;
+}
+
+.leaflet-control-attribution {
+  @apply !bg-ink-900/85 !text-[10px] !text-ink-400 !backdrop-blur;
+}
+.leaflet-control-attribution a {
+  @apply !text-accent-soft;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply !rounded-xl !border !border-white/10 !bg-ink-850/95 !text-ink-100 !shadow-panel !backdrop-blur-xl;
+}
+.leaflet-popup-tip {
+  @apply !bg-ink-850;
+}
+.leaflet-popup-content {
+  @apply !m-0;
+}
+.leaflet-popup-close-button {
+  @apply !text-ink-400 hover:!text-white;
+}
+
+/* Plotly's modebar is light by default and clashes badly. */
+.js-plotly-plot .modebar {
+  background: transparent !important;
+}
+.js-plotly-plot .modebar-btn path {
+  fill: #64748b !important;
+}
+.js-plotly-plot .modebar-btn:hover path {
+  fill: #2dd4bf !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

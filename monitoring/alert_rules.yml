@@ -1,0 +1,126 @@
+# Alert rules.
+#
+# Every alert carries a runbook annotation. An alert that fires without
+# telling the on-call person what to do is just noise.
+#
+# To demonstrate an alert firing (required by the course spec):
+#   docker compose stop api          -> APIDown fires after 1 minute
+#   scripts/trigger_alert.sh         -> HighAPIErrorRate fires
+
+groups:
+  - name: airwatch-availability
+    rules:
+
+      - alert: APIDown
+        expr: up{job="airwatch-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prediction API is not responding to scrapes"
+          description: "Prometheus cannot reach {{ $labels.instance }}."
+          runbook: >
+            Check `docker compose ps` and `docker compose logs api`.
+            If the model failed to load, GET /health reports the reason.
+            Restore service with `docker compose up -d api`; if a bad
+            model is the cause, run scripts/rollback.sh.
+
+      - alert: ModelNotLoaded
+        expr: absent(airwatch_model_version_info) == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is up but no model is loaded"
+          description: "The service is serving 503s on /predict."
+          runbook: >
+            GET /health returns the load error. Usual causes: the MLflow
+            registry is unreachable, or models/production/model.pkl is
+            missing. Run `python -m src.models.registry export-production`.
+
+  - name: airwatch-quality
+    rules:
+
+      - alert: HighAPIErrorRate
+        expr: |
+          (
+            sum(rate(flask_http_request_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(flask_http_request_total[5m])), 0.001)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of requests are failing"
+          description: "5xx rate is {{ $value | humanizePercentage }}."
+          runbook: >
+            Find the request id in the API logs, then check whether the
+            upstream feed or the model is at fault. GET /health shows
+            the cache age; a stale cache points at Open-Meteo.
+
+      - alert: HighPredictionLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(airwatch_prediction_latency_seconds_bucket[5m])) by (le)
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 prediction latency above 1 second"
+          description: "p95 is {{ $value | humanizeDuration }}."
+          runbook: >
+            Usually the live feature cache expiring and refetching 134
+            cities. Consider raising CACHE_TTL or pre-warming the cache
+            from the hourly Airflow DAG.
+
+      - alert: DataQualityFailures
+        expr: increase(airwatch_data_quality_failures_total[1h]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 10 data-quality failures in the last hour"
+          description: "Check {{ $labels.check }}."
+          runbook: >
+            If check=request_schema, a client is sending malformed
+            requests. If check=no_features, the ingestion DAG has not
+            run or Open-Meteo changed its response shape.
+
+      - alert: StaleUpstreamData
+        expr: airwatch_upstream_data_age_seconds > 10800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Upstream data is more than 3 hours old"
+          description: "Cache age is {{ $value | humanizeDuration }}."
+          runbook: >
+            Open-Meteo may be rate-limiting or down. Predictions are
+            still served but increasingly stale. Check the Airflow
+            hourly_ingest_dag for failed tasks.
+
+  - name: airwatch-drift
+    rules:
+
+      - alert: PredictionDistributionShift
+        expr: |
+          histogram_quantile(
+            0.5,
+            sum(rate(airwatch_predicted_pm25_ugm3_bucket[6h])) by (le)
+          ) > 150
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Median predicted PM2.5 above 150 µg/m³ for 30 minutes"
+          description: >
+            Either a genuine severe smog episode or the model has
+            drifted. Median is {{ $value }} µg/m³.
+          runbook: >
+            Cross-check against Open-Meteo's own values on the map. If
+            they disagree, run the Evidently drift report
+            (`python -m src.monitoring.drift`) and consider retraining
+            via the Airflow retraining_dag.

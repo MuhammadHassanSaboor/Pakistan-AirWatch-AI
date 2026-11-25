@@ -1,0 +1,125 @@
+# ═══════════════════════════════════════════════════════════════
+# Local multi-container stack.
+#
+#   docker compose up -d --build
+#
+#   API         http://localhost:5000/health
+#   Prometheus  http://localhost:9090
+#   Grafana     http://localhost:3001   (admin / $GRAFANA_PASSWORD)
+#   MLflow      http://localhost:5001   (local fallback)
+#   Postgres    localhost:5432          (not exposed publicly)
+#
+# Airflow lives in docker-compose.airflow.yml. It needs four more
+# services and several GB of RAM, so keeping it separate means the
+# everyday stack stays light.
+# ═══════════════════════════════════════════════════════════════
+
+services:
+
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: airwatch-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-airwatch}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"     # loopback only, never 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airwatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: airwatch-api:latest
+    container_name: airwatch-api
+    environment:
+      MODEL_SOURCE: ${MODEL_SOURCE:-local}
+      LOCAL_MODEL_PATH: /app/models/production
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+    volumes:
+      # Mounted read-only: promoting a model needs no image rebuild,
+      # and the container cannot tamper with the artifact.
+      - ./models/production:/app/models/production:ro
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.0
+    container_name: airwatch-mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5001
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflowdata:/mlflow
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: airwatch-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: airwatch-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mlflowdata:
+  promdata:
+  grafanadata:
