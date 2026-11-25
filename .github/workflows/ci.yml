@@ -171,56 +171,101 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
+      # Plain `docker build`, not docker/build-push-action with buildx.
+      #
+      # buildx attaches provenance attestations by default, which makes
+      # the result a manifest LIST. The docker exporter cannot load a
+      # manifest list into the daemon, so `load: true` fails on a
+      # standard runner. Docker Desktop hides this because it uses the
+      # containerd image store. The plain builder produces a single
+      # image that `docker run` can use directly, which is also exactly
+      # what we reproduce locally.
       - name: Build the API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile.api
-          tags: airwatch-api:${{ github.sha }}
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build \
+            --file docker/Dockerfile.api \
+            --tag airwatch-api:${{ github.sha }} \
+            --tag airwatch-api:ci \
+            .
+          docker images airwatch-api
 
+      # Reported, not enforced. `exit-code: 0` only stops *findings*
+      # from failing the step; an operational error such as a failed
+      # vulnerability-database download would still abort it, and a
+      # transient registry outage must not block the pipeline. Findings
+      # remain visible in the job log.
       - name: Scan the image for vulnerabilities
+        continue-on-error: true
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: airwatch-api:${{ github.sha }}
+          image-ref: airwatch-api:ci
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "0"        # raise to "1" once findings are triaged
+          exit-code: "0"
 
       - name: Smoke test the container
         run: |
+          set -euo pipefail
+
+          # Always surface what the container did, however this ends.
+          dump_and_clean() {
+            echo "::group::container state"
+            docker ps -a --filter name=smoke --format '{{.Names}} {{.Status}}' || true
+            echo "::endgroup::"
+            echo "::group::container logs"
+            docker logs smoke 2>&1 | tail -50 || true
+            echo "::endgroup::"
+            docker rm -f smoke >/dev/null 2>&1 || true
+          }
+          trap dump_and_clean EXIT
+
           docker run -d --name smoke -p 5000:5000 \
             -e MODEL_SOURCE=local \
-            airwatch-api:${{ github.sha }}
+            airwatch-api:ci
 
-          echo "waiting for the service to come up..."
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health || true)
-            # 503 is expected: no model is baked into the image.
-            if [ "$code" = "200" ] || [ "$code" = "503" ]; then
-              echo "service responded with $code"
+          echo "waiting for the service..."
+          ready=""
+          for _ in $(seq 1 45); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+                   http://localhost:5000/api/cities || echo 000)
+            if [ "$code" = "200" ]; then
+              ready=yes
+              echo "service is up"
               break
+            fi
+            if ! docker ps --filter name=smoke --filter status=running -q | grep -q .; then
+              echo "::error::container exited during startup"
+              exit 1
             fi
             sleep 2
           done
 
-          echo "--- /health ---"
-          curl -sS http://localhost:5000/health | head -c 400; echo
-          echo "--- /api/cities ---"
-          curl -sS http://localhost:5000/api/cities | head -c 200; echo
-          echo "--- /metrics ---"
-          curl -sS http://localhost:5000/metrics | grep -c airwatch_ || true
+          if [ -z "$ready" ]; then
+            echo "::error::service never became ready"
+            exit 1
+          fi
 
-          # The container must answer; a non-response is a failure.
-          curl -sf -o /dev/null -w "%{http_code}" http://localhost:5000/api/cities \
-            | grep -q 200
+          # /health is expected to be 503 here: no model is baked into
+          # the image. What matters is that it answers and explains why.
+          health=$(curl -s -o /tmp/health.json -w '%{http_code}' \
+                   http://localhost:5000/health || echo 000)
+          echo "/health -> $health"
+          head -c 400 /tmp/health.json; echo
+          case "$health" in
+            200|503) ;;
+            *) echo "::error::/health returned $health"; exit 1 ;;
+          esac
 
-          docker logs smoke | tail -20
-          docker rm -f smoke
+          cities=$(curl -s -o /dev/null -w '%{http_code}' \
+                   http://localhost:5000/api/cities)
+          echo "/api/cities -> $cities"
+          [ "$cities" = "200" ] || { echo "::error::/api/cities $cities"; exit 1; }
+
+          metrics=$(curl -s http://localhost:5000/metrics | grep -c '^airwatch_' || true)
+          echo "/metrics -> $metrics airwatch_ series"
+          [ "$metrics" -gt 0 ] || { echo "::error::no custom metrics"; exit 1; }
+
+          echo "smoke test passed"
 
   # ── 5. frontend ───────────────────────────────────────────
   frontend:
