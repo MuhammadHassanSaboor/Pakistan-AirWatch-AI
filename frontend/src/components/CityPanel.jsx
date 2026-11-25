@@ -53,7 +53,7 @@ export default function CityPanel({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 28 }}
           transition={{ duration: 0.38, ease: EASE }}
-          className="panel flex max-h-full flex-col overflow-hidden"
+          className="card flex max-h-full flex-col overflow-hidden"
         >
           <Content
             data={data}
@@ -277,7 +277,7 @@ function Content({ data, loading, error, onClose, onRetry, theme }) {
 
 function Head({ title, subtitle, onClose }) {
   return (
-    <header className="panel-head shrink-0">
+    <header className="card-head shrink-0">
       <div className="min-w-0">
         <h2 className="truncate text-sm font-bold tracking-tight text-fg">
           {title}
