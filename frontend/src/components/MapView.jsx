@@ -35,6 +35,43 @@ function ZoomWatcher({ onZoom }) {
   return null;
 }
 
+/**
+ * Force Leaflet to re-measure its container.
+ *
+ * Leaflet caches the container size when the map initialises. Our panel
+ * animates in (opacity + translateY) and uses a clamp() height, so the
+ * map frequently initialises while the container is still mid-layout
+ * and ends up rendering into a stale, sometimes zero-height box — the
+ * classic "grey map" or "map not visible". invalidateSize() on mount
+ * and on every container resize makes that impossible.
+ */
+function SizeFixer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const fix = () => map.invalidateSize({ animate: false });
+
+    // After the entrance animation and the first paint.
+    const raf = requestAnimationFrame(fix);
+    const timers = [60, 250, 600].map((ms) => setTimeout(fix, ms));
+
+    const container = map.getContainer();
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(fix) : null;
+    observer?.observe(container);
+    window.addEventListener("resize", fix);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
+      observer?.disconnect();
+      window.removeEventListener("resize", fix);
+    };
+  }, [map]);
+
+  return null;
+}
+
 function FlyToCity({ city }) {
   const map = useMap();
   useEffect(() => {
@@ -103,6 +140,7 @@ export default function MapView({
           </Pane>
         ) : null}
 
+        <SizeFixer />
         <ZoomWatcher onZoom={setZoom} />
         <FlyToCity city={selected} />
         <FitPakistan trigger={resetSignal} />

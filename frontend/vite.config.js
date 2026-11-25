@@ -1,32 +1,64 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-    // The browser talks only to our Flask API, never to Open-Meteo
-    // directly. That keeps upstream rate limits under our control and
-    // means no third-party key could ever reach the client.
-    proxy: {
-      "/api": { target: "http://localhost:5000", changeOrigin: true },
-      "/predict": { target: "http://localhost:5000", changeOrigin: true },
-      "/health": { target: "http://localhost:5000", changeOrigin: true },
-      "/model-info": { target: "http://localhost:5000", changeOrigin: true },
+export default defineConfig(({ mode }) => {
+  // Read the repo-root .env too, so the frontend proxy and the Flask
+  // app cannot drift apart. Setting API_PORT in one place moves both.
+  const env = loadEnv(mode, process.cwd(), "");
+  const rootEnv = loadEnv(mode, `${process.cwd()}/..`, "");
+
+  const apiPort = env.VITE_API_PORT || rootEnv.API_PORT || "5001";
+  const target = env.VITE_API_TARGET || `http://localhost:${apiPort}`;
+
+  // Port 5000 is contested on Windows and macOS. When something else
+  // owns it the failure is deceptive: the proxy connects, /health
+  // answers, and every real route 404s — which looks like a broken
+  // frontend rather than a port clash. Printing the target makes the
+  // mistake obvious on startup.
+  console.log(`\n  [airwatch] API proxy -> ${target}\n`);
+
+  const proxy = Object.fromEntries(
+    ["/api", "/predict", "/health", "/model-info", "/metrics"].map((path) => [
+      path,
+      {
+        target,
+        changeOrigin: true,
+        // Surface proxy failures instead of returning an opaque 500.
+        configure: (p) => {
+          p.on("error", (err) => {
+            console.error(
+              `  [airwatch] proxy error -> ${target}: ${err.message}\n` +
+                `  Is the API running?  conda activate airwatch && python -m src.serving.app`,
+            );
+          });
+        },
+      },
+    ]),
+  );
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 5173,
+      strictPort: false,
+      // The browser talks only to our Flask API, never to Open-Meteo
+      // directly. That keeps upstream rate limits under our control
+      // and means no third-party key could ever reach the client.
+      proxy,
     },
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: false,
-    chunkSizeWarningLimit: 4000, // plotly is large by nature
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          plotly: ["plotly.js-basic-dist-min"],
-          leaflet: ["leaflet", "react-leaflet"],
-          motion: ["framer-motion"],
+    build: {
+      outDir: "dist",
+      sourcemap: false,
+      chunkSizeWarningLimit: 1500,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            plotly: ["plotly.js-basic-dist-min"],
+            leaflet: ["leaflet", "react-leaflet"],
+            motion: ["framer-motion"],
+          },
         },
       },
     },
-  },
+  };
 });

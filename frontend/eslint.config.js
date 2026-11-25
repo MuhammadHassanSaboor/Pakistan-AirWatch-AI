@@ -17,8 +17,19 @@ export default [
       "*.min.js",
     ],
   },
+  // Build/config files run in Node, not the browser, so they need
+  // Node globals (process, __dirname). Without this, vite.config.js
+  // fails lint on `process.cwd()` while being perfectly correct.
   {
-    files: ["**/*.{js,jsx}"],
+    files: ["*.config.js", "vite.config.js", "eslint.config.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+  },
+  {
+    files: ["src/**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: 2022,
       globals: { ...globals.browser, ...globals.es2021 },

@@ -74,7 +74,7 @@ openmeteo_weather:
 # Leave the API key blank in .env and the pipeline skips this
 # source cleanly. The project works fully without it.
 openaq:
-  enabled: false
+  enabled: true
   base_url: https://api.openaq.org/v3
   country_iso: PK
   max_distance_km: 25        # station-to-city matching radius

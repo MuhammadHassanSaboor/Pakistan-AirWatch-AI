@@ -1,13 +1,29 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Layers3, ListOrdered, Map as MapIcon } from "lucide-react";
+import {
+  BarChart3,
+  Layers3,
+  ListOrdered,
+  Map as MapIcon,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import Header from "./components/Header";
 import StatTiles from "./components/StatTiles";
 import MapView from "./components/MapView";
 import CityPanel from "./components/CityPanel";
-import { CitySearch, HorizonSelector, LayerControls, Legend } from "./components/Controls";
-import { DistributionChart, ProvinceChart, TopCitiesChart } from "./components/charts";
+import DataSourceBanner from "./components/DataSourceBanner";
+import {
+  CitySearch,
+  HorizonSelector,
+  LayerControls,
+  Legend,
+} from "./components/Controls";
+import {
+  DistributionChart,
+  ProvinceChart,
+  TopCitiesChart,
+} from "./components/charts";
 import { ErrorState, Panel, PanelHead, Skeleton } from "./components/primitives";
 import Footer from "./components/Footer";
 
@@ -29,11 +45,9 @@ export default function App() {
   const stats = useApi(() => api.stats(), []);
   const forecast = useApi(() => api.forecast(horizon), [horizon]);
 
-  const history = useApi(
-    () => api.history(selectedCity, 7),
-    [selectedCity],
-    { enabled: Boolean(selectedCity) },
-  );
+  const history = useApi(() => api.history(selectedCity, 7), [selectedCity], {
+    enabled: Boolean(selectedCity),
+  });
 
   // The upstream feed updates hourly, so a 5-minute poll keeps the
   // status chip honest without hammering our own API.
@@ -51,7 +65,11 @@ export default function App() {
   }, [selectedCity]);
 
   const features = forecast.data?.features ?? [];
-  const apiDown = health.error && cities.error;
+
+  // Only treat the API as down when the two cheapest, most reliable
+  // calls BOTH fail. A single slow endpoint should degrade one panel,
+  // not blank the whole dashboard.
+  const apiDown = Boolean(health.error) && Boolean(cities.error);
 
   const selectedCityName = useMemo(
     () =>
@@ -65,17 +83,24 @@ export default function App() {
       <div className="flex min-h-screen flex-col">
         <Header health={null} modelInfo={null} onRefresh={refreshAll} />
         <main className="flex flex-1 items-center justify-center p-6">
-          <Panel className="max-w-md">
-            <ErrorState
-              error={health.error}
-              onRetry={refreshAll}
-            />
-            <div className="border-t border-white/[0.06] px-6 py-4 text-xs leading-relaxed text-ink-400">
-              <p className="mb-2 font-medium text-ink-300">Start the API:</p>
+          <Panel className="w-full max-w-lg">
+            <ErrorState error={health.error} onRetry={refreshAll} />
+            <div className="space-y-3 border-t border-white/[0.06] px-6 py-5 text-xs leading-relaxed text-ink-400">
+              <p className="font-medium text-ink-300">Start the API:</p>
               <pre className="overflow-x-auto rounded-lg bg-ink-950 p-3 font-mono text-[11px] text-accent-soft">
-{`conda activate airwatch
+                {`conda activate airwatch
 python -m src.serving.app`}
               </pre>
+              <p>
+                It should print{" "}
+                <span className="font-mono text-ink-300">
+                  Running on http://127.0.0.1:5001
+                </span>
+                . If another program already owns that port, change{" "}
+                <span className="font-mono text-ink-300">API_PORT</span> in{" "}
+                <span className="font-mono text-ink-300">.env</span> — the
+                frontend proxy reads the same value.
+              </p>
             </div>
           </Panel>
         </main>
@@ -92,12 +117,14 @@ python -m src.serving.app`}
         refreshing={forecast.loading || stats.loading}
       />
 
-      <main className="mx-auto w-full max-w-[1800px] flex-1 space-y-4 px-4 py-4 sm:px-6">
+      <main className="mx-auto w-full max-w-[1800px] flex-1 space-y-4 px-4 py-5 sm:px-6">
+        <DataSourceBanner health={health.data} />
+
         <StatTiles stats={stats.data} loading={stats.loading} />
 
-        {/* ── map + side panel ── */}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-          <Panel className="overflow-hidden" delay={0.05}>
+        {/* ── map + side rail ── */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <Panel className="flex flex-col overflow-hidden" delay={0.05}>
             <PanelHead title="National forecast map" icon={MapIcon}>
               <HorizonSelector
                 horizons={HORIZONS}
@@ -107,7 +134,8 @@ python -m src.serving.app`}
               />
             </PanelHead>
 
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
+              <SlidersHorizontal size={13} className="text-ink-600" />
               <CitySearch
                 cities={cities.data?.cities}
                 onSelect={setSelectedCity}
@@ -130,9 +158,16 @@ python -m src.serving.app`}
                   {selectedCityName}
                 </motion.span>
               ) : null}
+              <span className="ml-auto hidden text-[11px] text-ink-600 lg:inline">
+                click any city for detail
+              </span>
             </div>
 
-            <div className="h-[clamp(380px,56vh,680px)]">
+            {/* A fixed-ratio box, not a percentage of the viewport.
+                Leaflet measures its container once on init; a height
+                that depends on content can still be settling at that
+                moment, which is how maps end up rendering grey. */}
+            <div className="h-[clamp(440px,60vh,720px)] w-full">
               {forecast.error ? (
                 <ErrorState error={forecast.error} onRetry={forecast.refetch} />
               ) : (
@@ -160,16 +195,16 @@ python -m src.serving.app`}
               />
             ) : (
               <Panel delay={0.1}>
-                <PanelHead title="AQI scale" icon={Layers3} />
+                <PanelHead title="Air quality scale" icon={Layers3} />
                 <Legend
                   bands={legend.data?.bands}
                   standard={legend.data?.standard}
                 />
                 <div className="border-t border-white/[0.06] px-4 py-3">
                   <p className="text-[11px] leading-relaxed text-ink-400">
-                    Click any city on the map to see its recent history, the
-                    provider&rsquo;s forecast and our model&rsquo;s prediction
-                    side by side.
+                    Select a city on the map to compare its recent history, the
+                    provider&rsquo;s own forecast and our model&rsquo;s
+                    prediction side by side.
                   </p>
                 </div>
               </Panel>
@@ -177,31 +212,34 @@ python -m src.serving.app`}
 
             <Panel delay={0.15}>
               <PanelHead title="Average by province" icon={BarChart3} />
-              <div className="px-2 pb-2">
+              <div className="px-2 pb-3 pt-1">
                 {forecast.loading ? (
-                  <Skeleton className="m-2 h-48" />
+                  <Skeleton className="m-2 h-52" />
                 ) : (
-                  <ProvinceChart features={features} height={240} />
+                  <ProvinceChart features={features} height={250} />
                 )}
               </div>
             </Panel>
           </div>
         </div>
 
-        {/* ── analytics row ── */}
+        {/* ── analytics ── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Panel delay={0.2}>
-            <PanelHead title={`Most polluted cities · +${horizon}h`} icon={ListOrdered}>
+            <PanelHead
+              title={`Most polluted · +${horizon}h forecast`}
+              icon={ListOrdered}
+            >
               <span className="chip">click a bar to inspect</span>
             </PanelHead>
-            <div className="px-2 pb-2">
+            <div className="px-2 pb-3 pt-1">
               {forecast.loading ? (
                 <Skeleton className="m-2 h-64" />
               ) : (
                 <TopCitiesChart
                   features={features}
                   topN={12}
-                  height={300}
+                  height={310}
                   onSelect={setSelectedCity}
                 />
               )}
@@ -209,12 +247,14 @@ python -m src.serving.app`}
           </Panel>
 
           <Panel delay={0.25}>
-            <PanelHead title="Distribution across cities" icon={BarChart3} />
-            <div className="px-2 pb-2">
+            <PanelHead title="Distribution across cities" icon={BarChart3}>
+              <span className="chip">{features.length} cities</span>
+            </PanelHead>
+            <div className="px-2 pb-3 pt-1">
               {forecast.loading ? (
                 <Skeleton className="m-2 h-64" />
               ) : (
-                <DistributionChart features={features} height={300} />
+                <DistributionChart features={features} height={310} />
               )}
             </div>
           </Panel>

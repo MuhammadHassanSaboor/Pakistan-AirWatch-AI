@@ -205,7 +205,88 @@ schema : pass
 
 ---
 
-## 6. Ground truth: currently unavailable
+## 6a. Ground truth: OBTAINED — and it changes the headline claim
+
+**Update, 25 November 2026.** The OpenAQ key arrived and the picture is
+far better than §6 (kept below for the record) assumed.
+
+### What is actually available
+
+| | |
+|---|---|
+| Pakistani locations reporting PM2.5 | **508** |
+| Matched to one of our cities within 25 km | **493**, covering **61 cities** |
+| Reference-grade instruments | 2 (US Diplomatic Posts, Islamabad and Lahore) |
+| Low-cost community sensors | 491 |
+| Hours collected | **41,217** (30,811 reference, 10,406 low-cost) |
+
+The reference monitors cover **2022-08-05 → 2025-03-04**, after which
+the US State Department's global air-monitoring programme stopped
+publishing. That still overlaps our dataset by about 2.5 years.
+
+### The result: our target is biased low
+
+`python -m src.data.openaq --validate` compares the CAMS reanalysis we
+train on against the instruments:
+
+| Comparison | Hours | MAE | Bias | r | Mean observed |
+|---|---|---|---|---|---|
+| **Reference-grade** | 19,327 | **27.4** | **−12.5** | 0.67 | 66.6 |
+| Low-cost sensors | 2,911 | 82.8 | −82.0 | 0.71 | 138.9 |
+
+Per reference station:
+
+| City | Hours | MAE | Bias | r | Mean observed |
+|---|---|---|---|---|---|
+| Islamabad | 15,076 | 23.3 | −8.9 | 0.48 | 45.9 |
+| Lahore | 4,251 | 41.9 | −25.5 | 0.71 | 90.6 |
+
+**A negative bias means the reanalysis reads LOWER than the
+instrument.** CAMS tracks the *shape* of Pakistani air quality
+reasonably (r ≈ 0.67) but systematically **understates its
+magnitude**, and the gap widens in dirtier air — −8.9 µg/m³ in
+Islamabad against −25.5 µg/m³ in Lahore.
+
+### Why this matters more than the model's own error
+
+> Our model forecasts the reanalysis with a test MAE of **8.2 µg/m³**.
+> The reanalysis differs from reference instruments by **27.4 µg/m³**.
+>
+> **The dominant source of error is the target, not the model.**
+
+That single comparison is the most important number in the project. It
+means a reported figure of, say, 60 µg/m³ should be read as "the
+reanalysis scale", and the real air is likely dirtier. Presenting these
+predictions as sensor-equivalent would overstate air quality in exactly
+the places where it is worst.
+
+### The low-cost caveat, stated both ways
+
+Against low-cost sensors the apparent bias is −82 µg/m³, which is
+**not** six times worse reanalysis. Low-cost optical particle sensors
+are well known to over-report, especially in humid conditions. The
+truth sits between the two: the reanalysis under-reads *and* the
+cheap sensors over-read. This is precisely why `provider_tier` is
+recorded on every observation and why the reference comparison is the
+one quoted.
+
+### What we do with it
+
+- **Validation only, never training.** 61 of 134 cities have a nearby
+  station and they skew urban; training on them would bake that bias
+  into a model claiming national coverage.
+- The figures above go in the report as the project's primary
+  limitation, with a number attached rather than a caveat.
+- Reproduce with:
+  ```bash
+  python -m src.data.openaq --locations
+  python -m src.data.openaq --measurements --days 45
+  python -m src.data.openaq --validate
+  ```
+
+---
+
+## 6. Ground truth: originally unavailable *(superseded by §6a)*
 
 **OpenAQ registration did not complete.** The account was created but
 the verification email never arrived (checked inbox and spam, two

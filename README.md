@@ -284,11 +284,23 @@ A leaking model scores brilliantly and forecasts nothing.
 
 Stated plainly, because they affect how the numbers should be read.
 
-1. **The target is a reanalysis product, not a sensor.** We forecast
-   CAMS reanalysis PM2.5. A model that matched it perfectly would still
-   inherit all of the reanalysis's biases.
-2. **No independent ground truth.** OpenAQ registration did not
-   complete, so we have no sensor data to validate against.
+1. **The target is a reanalysis product, and it reads low.** We
+   forecast CAMS reanalysis PM2.5. Validated against 19,327 hours from
+   reference-grade instruments (US Diplomatic Posts, Islamabad and
+   Lahore), the reanalysis has **MAE 27.4 µg/m³ and a −12.5 µg/m³
+   bias** — it tracks the shape of Pakistani air quality (r ≈ 0.67)
+   but understates its magnitude, and the gap widens in dirtier air
+   (−8.9 in Islamabad, −25.5 in Lahore).
+
+   **The dominant error is the target, not the model:** our model
+   forecasts the reanalysis to 8.2 µg/m³, while the reanalysis itself
+   sits 27.4 µg/m³ from the instruments. Read the numbers on this map
+   as "reanalysis scale"; real air is likely dirtier.
+2. **Ground truth exists but is sparse and uneven.** 493 OpenAQ
+   stations match 61 of our 134 cities, but only 2 are reference-grade
+   and they stopped reporting in March 2025. The rest are low-cost
+   sensors, which over-report. We use them for validation only, never
+   for training.
 3. **Uneven accuracy.** Error is lowest where the atmosphere is
    well-observed — large Punjab cities — and highest in Balochistan and
    Gilgit-Baltistan, which is exactly where people have the least air

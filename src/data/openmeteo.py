@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime, timedelta
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -40,6 +40,15 @@ _FETCH = DATA_CFG["fetch"]
 AIR_QUALITY_EPOCH = DATA_CFG["time"]["air_quality_start"]
 
 USER_AGENT = "pakistan-airwatch-ai/0.1 (academic MLOps course project)"
+
+# Longest a *serving* request may wait on a rate limit.
+#
+# The backfill can afford to sleep until a quota window rolls over --
+# it runs unattended for hours. A web request cannot: the same logic
+# once slept 58,167 seconds inside an HTTP handler, hanging the API
+# until the daily quota reset. Serving calls pass this budget and fail
+# fast instead, so the caller can fall back to cached or local data.
+SERVING_WAIT_BUDGET_SECONDS = 20.0
 
 
 class OpenMeteoError(RuntimeError):
@@ -104,9 +113,21 @@ def _rate_limit_wait(body: str, default: float) -> float:
     return default
 
 
-def _request(url: str, params: dict[str, Any]) -> dict[str, Any]:
-    """GET with retries, exponential backoff and 429 handling."""
-    max_retries = int(_FETCH["max_retries"])
+def _request(
+    url: str,
+    params: dict[str, Any],
+    *,
+    max_wait_seconds: float | None = None,
+    max_retries: int | None = None,
+) -> dict[str, Any]:
+    """GET with retries, exponential backoff and 429 handling.
+
+    `max_wait_seconds` caps how long a single rate-limit wait may be.
+    Serving callers pass a small budget so a quota exhaustion surfaces
+    as an immediate error rather than a hung request; the backfill
+    leaves it unset and waits for the window to roll over.
+    """
+    max_retries = int(max_retries if max_retries is not None else _FETCH["max_retries"])
     backoff = float(_FETCH["backoff_seconds"])
     timeout = float(_FETCH["timeout_seconds"])
     last_error: Exception | None = None
@@ -141,6 +162,13 @@ def _request(url: str, params: dict[str, Any]) -> dict[str, Any]:
             STATS.rate_limited += 1
             STATS.retries += 1
             wait = _rate_limit_wait(resp.text, backoff)
+            if max_wait_seconds is not None and wait > max_wait_seconds:
+                STATS.failures += 1
+                raise OpenMeteoError(
+                    f"rate limited ({_limit_kind(resp.text)}); the next "
+                    f"window is {wait:.0f}s away, which exceeds the "
+                    f"{max_wait_seconds:.0f}s serving budget"
+                )
             log.warning(
                 "Rate limited (429): %s Sleeping %.0fs before retry %d/%d.",
                 _limit_kind(resp.text),
@@ -317,6 +345,9 @@ def fetch_air_quality_live(
             "forecast_days": forecast_days or _AQ["live"]["forecast_days"],
             "timezone": "UTC",
         },
+        # Serving path: fail fast rather than wait out a quota window.
+        max_wait_seconds=SERVING_WAIT_BUDGET_SECONDS,
+        max_retries=2,
     )
     # A single coordinate returns an object, many return a list.
     blocks = payload if isinstance(payload, list) else [payload]
@@ -343,6 +374,8 @@ def fetch_weather_forecast(
             "forecast_days": forecast_days or _AQ["live"]["forecast_days"],
             "timezone": "UTC",
         },
+        max_wait_seconds=SERVING_WAIT_BUDGET_SECONDS,
+        max_retries=2,
     )
     blocks = payload if isinstance(payload, list) else [payload]
     return [_hourly_to_frame(b) for b in blocks]
@@ -385,6 +418,7 @@ def probe_earliest_data(
 
 __all__ = [
     "AIR_QUALITY_EPOCH",
+    "SERVING_WAIT_BUDGET_SECONDS",
     "OpenMeteoError",
     "STATS",
     "fetch_air_quality_archive",

@@ -53,7 +53,8 @@ services:
       # and the container cannot tamper with the artifact.
       - ./models/production:/app/models/production:ro
     ports:
-      - "5000:5000"
+      # host 5001 -> container 5000, avoiding the contested host port
+      - "5001:5000"
     depends_on:
       db:
         condition: service_healthy
