@@ -62,9 +62,18 @@ jobs:
             --no-banner \
             --exit-code 1
 
-      - name: Audit dependencies for known vulnerabilities
-        run: pip-audit -r requirements-api.txt --desc
-        continue-on-error: true    # report, do not block, on advisories
+      # Report-only. pip-audit exits 1 whenever any advisory exists,
+      # which is almost always true for a pinned dependency set. Left
+      # bare it painted a red "exit code 1" annotation on a job that had
+      # actually passed, which made every run look broken. Swallowing
+      # the status keeps the findings visible without the false alarm.
+      #
+      # This is a report, not a gate: upgrading pinned versions is a
+      # deliberate decision, not something CI should force mid-sprint.
+      - name: Audit dependencies for known vulnerabilities (report only)
+        run: |
+          pip-audit -r requirements-api.txt --desc \
+            || echo "::notice::pip-audit reported advisories; see the log above"
 
   # ── 2. tests — the gate everything else depends on ────────
   test:
@@ -189,19 +198,31 @@ jobs:
             .
           docker images airwatch-api
 
-      # Reported, not enforced. `exit-code: 0` only stops *findings*
-      # from failing the step; an operational error such as a failed
-      # vulnerability-database download would still abort it, and a
-      # transient registry outage must not block the pipeline. Findings
-      # remain visible in the job log.
-      - name: Scan the image for vulnerabilities
+      # Trivy via its official image, not the marketplace action.
+      #
+      # `aquasecurity/trivy-action@0.28.0` does not exist — that tag was
+      # never published (real tags are v0.33+). An unresolvable action
+      # fails the job BEFORE the step runs, so continue-on-error cannot
+      # rescue it. Running the container removes action-version
+      # resolution as a failure mode entirely.
+      #
+      # Report-only, and triple-guarded: --exit-code 0 so findings do
+      # not fail, `|| echo` so a database-download or registry outage
+      # does not fail, and continue-on-error as a backstop. The report
+      # stays visible in the log.
+      - name: Scan the image for vulnerabilities (report only)
         continue-on-error: true
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: airwatch-api:ci
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "0"
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.0 image \
+              --severity CRITICAL,HIGH \
+              --ignore-unfixed \
+              --exit-code 0 \
+              --no-progress \
+              --timeout 10m \
+              airwatch-api:ci \
+            || echo "::warning::Trivy scan unavailable; continuing"
 
       - name: Smoke test the container
         run: |
