@@ -3,72 +3,94 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   Theme tokens
+   Design tokens
 
-   Both palettes are tuned for contrast, not for looking moody.
-   Body text clears WCAG AA against its surface in each theme; the
-   previous UI used ~11px text at low contrast almost everywhere,
-   which is what made the page hard to read.
+   Principles borrowed from interfaces that hold up at this density
+   (Linear, Vercel, Stripe):
+
+   1. Near-neutral surfaces. Colour is reserved for DATA, so a red
+      marker means "unhealthy air" and never "decorative accent".
+   2. Elevation by hairline border + layered shadow, not by heavy
+      glass blur, which smears text at small sizes.
+   3. One accent, used sparingly. When everything is highlighted,
+      nothing is.
+   4. Tight tracking on large numbers, loose on small caps labels.
    ═══════════════════════════════════════════════════════════ */
 
 @layer base {
   :root,
   [data-theme="dark"] {
-    --c-canvas: 9 13 22; /* #090D16 */
-    --c-surface: 17 24 38; /* #111826 */
-    --c-raised: 25 34 51; /* #192233 */
-    --c-sunken: 13 18 29; /* #0D121D */
-    --c-line: 42 54 74;
-    --c-line-strong: 62 78 102;
+    --c-canvas: 8 9 13; /* #08090D */
+    --c-surface: 16 18 24; /* #101218 */
+    --c-raised: 23 26 34; /* #171A22 */
+    --c-sunken: 11 13 18;
+    --c-line: 31 35 45; /* hairline */
+    --c-line-strong: 52 58 72;
 
-    --c-fg: 237 242 249; /* near-white  ~15:1 */
-    --c-fg-muted: 176 189 207; /* ~8.5:1 */
-    --c-fg-subtle: 134 149 170; /* ~5.4:1 */
-    --c-fg-faint: 100 114 135;
+    --c-fg: 248 250 252; /* 17:1 */
+    --c-fg-muted: 165 174 190; /* 8.2:1 */
+    --c-fg-subtle: 123 133 151; /* 4.9:1 */
+    --c-fg-faint: 88 97 113;
 
-    --c-accent: 20 184 166;
-    --c-accent-soft: 61 212 195;
-    --c-accent-strong: 13 148 136;
+    --c-accent: 45 212 191;
+    --c-accent-soft: 94 234 212;
+    --c-accent-strong: 20 184 166;
 
-    --c-ok: 52 199 123;
-    --c-warn: 240 180 41;
-    --c-danger: 242 85 80;
+    --c-ok: 52 211 153;
+    --c-warn: 251 191 36;
+    --c-danger: 248 113 113;
 
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -14px rgb(0 0 0 / 0.65);
-    --shadow-raised: 0 2px 6px rgb(0 0 0 / 0.35), 0 18px 40px -18px rgb(0 0 0 / 0.7);
+    /* Layered shadows read as real elevation; a single large blur
+       reads as a smudge. */
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-card:
+      0 1px 2px rgb(0 0 0 / 0.5), 0 4px 12px -4px rgb(0 0 0 / 0.5),
+      0 12px 32px -12px rgb(0 0 0 / 0.6);
+    --shadow-float:
+      0 2px 4px rgb(0 0 0 / 0.5), 0 8px 20px -6px rgb(0 0 0 / 0.55),
+      0 24px 56px -20px rgb(0 0 0 / 0.7);
 
-    --glow-a: rgba(20, 184, 166, 0.1);
-    --glow-b: rgba(56, 130, 246, 0.08);
+    --hairline: rgb(255 255 255 / 0.06);
+    --sheen: rgb(255 255 255 / 0.04);
+    --glow-a: rgba(45, 212, 191, 0.08);
+    --glow-b: rgba(59, 130, 246, 0.06);
 
     color-scheme: dark;
   }
 
   [data-theme="light"] {
-    --c-canvas: 243 246 250; /* #F3F6FA */
+    --c-canvas: 249 250 251;
     --c-surface: 255 255 255;
-    --c-raised: 248 250 253;
-    --c-sunken: 237 242 248;
-    --c-line: 219 227 238;
-    --c-line-strong: 190 202 218;
+    --c-raised: 246 247 249;
+    --c-sunken: 241 243 246;
+    --c-line: 228 231 237;
+    --c-line-strong: 203 208 218;
 
-    --c-fg: 14 23 38; /* ~16:1 on white */
-    --c-fg-muted: 62 77 99; /* ~8.9:1 */
-    --c-fg-subtle: 95 112 136; /* ~5.1:1 */
-    --c-fg-faint: 133 148 170;
+    --c-fg: 11 15 25; /* 17:1 on white */
+    --c-fg-muted: 76 86 104; /* 7.6:1 */
+    --c-fg-subtle: 110 120 138; /* 4.6:1 */
+    --c-fg-faint: 148 158 175;
 
     --c-accent: 13 148 136;
     --c-accent-soft: 15 118 110;
     --c-accent-strong: 17 94 89;
 
-    --c-ok: 22 143 87;
+    --c-ok: 16 145 93;
     --c-warn: 180 124 10;
-    --c-danger: 203 48 44;
+    --c-danger: 208 58 54;
 
-    --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 8px 24px -12px rgb(15 23 42 / 0.16);
-    --shadow-raised: 0 2px 6px rgb(15 23 42 / 0.07), 0 16px 36px -16px rgb(15 23 42 / 0.2);
+    --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
+    --shadow-card:
+      0 1px 2px rgb(16 24 40 / 0.05), 0 2px 6px -1px rgb(16 24 40 / 0.06),
+      0 12px 28px -12px rgb(16 24 40 / 0.14);
+    --shadow-float:
+      0 2px 4px rgb(16 24 40 / 0.06), 0 8px 20px -6px rgb(16 24 40 / 0.1),
+      0 24px 48px -16px rgb(16 24 40 / 0.16);
 
-    --glow-a: rgba(13, 148, 136, 0.07);
-    --glow-b: rgba(56, 130, 246, 0.06);
+    --hairline: rgb(16 24 40 / 0.07);
+    --sheen: rgb(255 255 255 / 0.7);
+    --glow-a: rgba(13, 148, 136, 0.06);
+    --glow-b: rgba(59, 130, 246, 0.05);
 
     color-scheme: light;
   }
@@ -82,36 +104,45 @@
   body {
     @apply bg-canvas text-fg font-sans text-sm antialiased;
     background-image:
-      radial-gradient(900px 520px at 10% -10%, var(--glow-a), transparent 60%),
-      radial-gradient(820px 460px at 94% 2%, var(--glow-b), transparent 62%);
+      radial-gradient(1100px 600px at 8% -12%, var(--glow-a), transparent 58%),
+      radial-gradient(900px 500px at 96% -4%, var(--glow-b), transparent 60%);
     background-attachment: fixed;
     transition:
-      background-color 0.25s ease,
-      color 0.25s ease;
+      background-color 0.3s ease,
+      color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Tabular figures everywhere numbers are compared. */
   .tnum,
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 11px;
+    height: 11px;
   }
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-line-strong/60;
+    @apply rounded-full;
+    background-color: rgb(var(--c-line-strong) / 0.55);
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-line-strong;
+    background-color: rgb(var(--c-line-strong) / 0.9);
+    background-clip: content-box;
   }
 
   *:focus-visible {
-    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+    @apply outline-none ring-2 ring-accent/60 ring-offset-2 ring-offset-canvas;
+  }
+
+  ::selection {
+    background-color: rgb(var(--c-accent) / 0.25);
   }
 }
 
@@ -120,42 +151,94 @@
    ═══════════════════════════════════════════════════════════ */
 
 @layer components {
-  .panel {
-    @apply rounded-card border border-line bg-surface shadow-card;
+  /* A card reads as elevated through three cues: hairline border,
+     layered shadow, and a 1px top sheen that suggests a light source.
+     That last detail is what separates a "box" from a surface. */
+  .card {
+    @apply relative rounded-2xl border bg-surface shadow-card;
+    border-color: var(--hairline);
   }
 
-  .panel-head {
-    @apply flex items-center justify-between gap-3 border-b border-line px-5 py-3.5;
+  .card::before {
+    content: "";
+    @apply pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-2xl;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--sheen) 20%,
+      var(--sheen) 80%,
+      transparent
+    );
   }
 
-  /* Section labels. Uppercase + tracking reads as a label rather than
-     shrunken body text, so it can stay small without hurting. */
-  .panel-title {
-    @apply text-2xs font-semibold uppercase tracking-[0.1em] text-fg-subtle;
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    @apply -translate-y-0.5 shadow-float;
+    border-color: rgb(var(--c-line-strong) / 0.6);
+  }
+
+  .card-head {
+    @apply flex items-center justify-between gap-3 px-5 pb-3 pt-4;
+  }
+
+  .card-title {
+    @apply text-[13px] font-semibold tracking-tight text-fg;
+  }
+
+  .eyebrow {
+    @apply text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-faint;
+  }
+
+  /* Floating control surfaces that sit over the map. These DO use
+     blur, because they overlay imagery rather than hold body text. */
+  .float {
+    @apply rounded-xl border shadow-float backdrop-blur-xl;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-surface) / 0.86);
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line
-           bg-raised px-2.5 py-1 text-2xs font-medium text-fg-muted;
+    @apply inline-flex items-center gap-1.5 rounded-lg border px-2 py-1
+           text-[11px] font-medium text-fg-muted;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-raised) / 0.8);
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line
-           bg-raised px-3 py-1.5 text-xs font-medium text-fg-muted
-           transition-all duration-150 hover:border-line-strong hover:text-fg
-           active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border
+           px-2.5 py-1.5 text-xs font-medium text-fg-muted
+           transition-all duration-150
+           hover:text-fg active:scale-[0.97]
+           disabled:cursor-not-allowed disabled:opacity-40;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-raised) / 0.85);
+  }
+  .btn:hover {
+    border-color: rgb(var(--c-line-strong) / 0.7);
   }
 
   .btn-accent {
-    @apply border-accent/40 bg-accent/12 text-accent hover:border-accent/60 hover:bg-accent/20;
+    @apply text-accent;
+    border-color: rgb(var(--c-accent) / 0.35);
+    background-color: rgb(var(--c-accent) / 0.12);
+  }
+  .btn-accent:hover {
+    border-color: rgb(var(--c-accent) / 0.55);
+    background-color: rgb(var(--c-accent) / 0.2);
   }
 
-  .card-value {
-    @apply font-mono text-4xl font-semibold leading-none tracking-tight;
+  /* Big metrics. Negative tracking is what stops large numerals
+     looking like they were simply scaled up. */
+  .metric {
+    @apply font-mono font-semibold leading-none;
+    letter-spacing: -0.035em;
   }
 
   .skeleton {
-    @apply relative overflow-hidden rounded-lg bg-raised;
+    @apply relative overflow-hidden rounded-lg;
+    background-color: rgb(var(--c-raised));
   }
   .skeleton::after {
     content: "";
@@ -163,14 +246,25 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgb(var(--c-fg) / 0.06),
+      rgb(var(--c-fg) / 0.07),
+      transparent
+    );
+  }
+
+  .divider {
+    @apply h-px w-full;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--hairline) 15%,
+      var(--hairline) 85%,
       transparent
     );
   }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Leaflet — themed to match
+   Leaflet
    ═══════════════════════════════════════════════════════════ */
 
 .leaflet-container {
@@ -178,46 +272,64 @@
   outline: none;
 }
 
+/* Default zoom buttons are chunky and bright. Match the float style. */
+.leaflet-control-zoom {
+  @apply !overflow-hidden !rounded-xl !border-0 !shadow-float;
+}
 .leaflet-control-zoom a {
-  @apply !border-line !bg-surface/95 !text-fg-muted !backdrop-blur;
+  @apply !h-8 !w-8 !border-0 !leading-8 !text-fg-muted !backdrop-blur-xl;
+  background-color: rgb(var(--c-surface) / 0.86) !important;
+}
+.leaflet-control-zoom a:first-child {
+  border-bottom: 1px solid var(--hairline) !important;
 }
 .leaflet-control-zoom a:hover {
-  @apply !bg-raised !text-fg;
+  @apply !text-fg;
+  background-color: rgb(var(--c-raised) / 0.95) !important;
 }
 
 .leaflet-control-attribution {
-  @apply !bg-surface/90 !text-[10px] !text-fg-faint !backdrop-blur;
+  @apply !px-2 !py-0.5 !text-[10px] !text-fg-faint !backdrop-blur;
+  background-color: rgb(var(--c-surface) / 0.75) !important;
 }
 .leaflet-control-attribution a {
-  @apply !text-accent;
+  @apply !text-fg-subtle;
 }
 
 .leaflet-popup-content-wrapper,
 .leaflet-tooltip {
-  @apply !rounded-xl !border !border-line !bg-surface !text-fg !shadow-raised;
+  @apply !rounded-xl !border !text-fg !shadow-float;
+  border-color: var(--hairline) !important;
+  background-color: rgb(var(--c-surface) / 0.96) !important;
+  backdrop-filter: blur(12px);
 }
 .leaflet-popup-tip {
-  @apply !bg-surface;
+  background-color: rgb(var(--c-surface)) !important;
 }
 .leaflet-popup-content {
   @apply !m-0;
 }
 
-/* Permanent PM2.5 chips beside each marker. The solid plate keeps
-   them legible over satellite imagery as well as flat tiles. */
+/* Value chips beside markers: a solid plate so they stay legible
+   over satellite imagery as well as flat tiles. */
 .airwatch-value-label {
-  @apply !rounded-md !border !border-line !bg-surface/92 !px-1.5 !py-0.5
-         !font-mono !text-[11px] !font-bold !leading-none !shadow-none;
+  @apply !rounded-md !border !px-1.5 !py-px !font-mono !text-[11px]
+         !font-bold !leading-[1.4] !shadow-sm;
+  border-color: var(--hairline) !important;
+  background-color: rgb(var(--c-surface) / 0.92) !important;
+  backdrop-filter: blur(6px);
 }
 .airwatch-value-label::before {
   display: none;
 }
 
 .leaflet-control-scale-line {
-  @apply !border-line-strong !bg-surface/85 !text-[10px] !text-fg-muted !backdrop-blur;
+  @apply !rounded !border !px-1.5 !text-[10px] !text-fg-muted !backdrop-blur;
+  border-color: var(--hairline) !important;
+  background-color: rgb(var(--c-surface) / 0.8) !important;
 }
 
-/* Plotly's modebar defaults clash with both themes. */
+/* Plotly chrome */
 .js-plotly-plot .modebar {
   background: transparent !important;
 }

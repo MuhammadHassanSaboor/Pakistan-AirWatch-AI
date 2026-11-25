@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Clock, Layers, Maximize2, Search, X } from "lucide-react";
+import { Layers, Maximize2, Search, X } from "lucide-react";
 import clsx from "clsx";
 import { useMemo, useState } from "react";
 
@@ -12,9 +12,14 @@ import { UNIT } from "../lib/format";
 
 export function HorizonSelector({ horizons, value, onChange, disabled }) {
   return (
-    <div className="flex items-center gap-2">
-      <Clock size={13} className="text-fg-faint" />
-      <div className="relative flex rounded-lg border border-line bg-raised p-0.5">
+    <div className="flex items-center">
+      <div
+        className="relative grid w-full grid-cols-4 gap-0.5 rounded-lg border p-1"
+        style={{
+          borderColor: "var(--hairline)",
+          backgroundColor: "rgb(var(--c-sunken))",
+        }}
+      >
         {horizons.map((h) => {
           const active = h === value;
           return (
@@ -24,7 +29,7 @@ export function HorizonSelector({ horizons, value, onChange, disabled }) {
               disabled={disabled}
               onClick={() => onChange(h)}
               className={clsx(
-                "relative z-10 rounded-md px-3 py-1 text-xs font-semibold transition-colors duration-200",
+                "relative z-10 rounded-md py-1.5 text-xs font-semibold transition-colors duration-200",
                 active ? "text-canvas" : "text-fg-muted hover:text-fg",
                 disabled && "cursor-not-allowed opacity-50",
               )}
@@ -47,7 +52,7 @@ export function HorizonSelector({ horizons, value, onChange, disabled }) {
 
 /* ── province filter + city search ───────────────────────── */
 
-export function CitySearch({ cities, onSelect, selectedCity }) {
+export function CitySearch({ cities, onSelect, selectedCity, fullWidth }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -64,8 +69,14 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
   }, [cities, query]);
 
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2 rounded-lg border border-line bg-raised px-2.5 py-1.5 focus-within:border-accent/50">
+    <div className={clsx("relative", fullWidth && "w-full")}>
+      <div
+        className="flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors focus-within:border-accent/50"
+        style={{
+          borderColor: "var(--hairline)",
+          backgroundColor: "rgb(var(--c-sunken))",
+        }}
+      >
         <Search size={13} className="shrink-0 text-fg-faint" />
         <input
           type="text"
@@ -77,7 +88,10 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="w-32 bg-transparent text-xs text-fg placeholder:text-fg-faint focus:outline-none sm:w-40"
+          className={clsx(
+            "bg-transparent text-xs text-fg placeholder:text-fg-faint focus:outline-none",
+            fullWidth ? "w-full" : "w-32 sm:w-40",
+          )}
         />
         {query ? (
           <button
@@ -99,7 +113,10 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.16 }}
-          className="absolute right-0 z-[1200] mt-1.5 w-60 overflow-hidden rounded-xl border border-line bg-surface/95 shadow-panel backdrop-blur-xl"
+          className={clsx(
+            "float absolute right-0 z-[1200] mt-2 overflow-hidden",
+            fullWidth ? "left-0" : "w-60",
+          )}
         >
           {matches.map((c) => (
             <li key={c.city_id}>
@@ -164,7 +181,7 @@ export function Legend({ bands, standard }) {
   const list = bands?.length ? bands : AQI_BANDS;
 
   return (
-    <div className="px-4 py-3">
+    <div className="px-5 pb-4 pt-1">
       <div className="space-y-1.5">
         {list.map((b, i) => {
           const name = b.name;
@@ -176,7 +193,7 @@ export function Legend({ bands, standard }) {
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.035, duration: 0.3 }}
-              className="flex items-center gap-2.5"
+              className="flex items-center gap-2.5 py-0.5"
             >
               <span
                 className="h-3 w-3 shrink-0 rounded-sm"
@@ -195,7 +212,8 @@ export function Legend({ bands, standard }) {
         })}
       </div>
 
-      <p className="mt-3 border-t border-line pt-2 text-2xs leading-relaxed text-fg-faint">
+      <p className="mt-3.5 border-t pt-2.5 text-[11px] leading-relaxed text-fg-faint"
+         style={{ borderColor: "var(--hairline)" }}>
         Ranges in {UNIT}. Colours follow the{" "}
         <span className="text-fg-subtle">{standard ?? "US EPA"}</span> AQI
         breakpoints for PM2.5.

@@ -89,7 +89,10 @@ export default {
 
       boxShadow: {
         card: "var(--shadow-card)",
-        raised: "var(--shadow-raised)",
+        float: "var(--shadow-float)",
+        // Kept as an alias: several components still reference it and
+        // it should mean the same elevation as `float`.
+        raised: "var(--shadow-float)",
         glow: "0 0 0 1px rgb(var(--c-accent) / 0.3), 0 0 24px -8px rgb(var(--c-accent) / 0.45)",
       },
 

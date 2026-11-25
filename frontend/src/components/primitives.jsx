@@ -24,7 +24,7 @@ export function Panel({ className, children, delay = 0, ...rest }) {
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: EASE, delay }}
-      className={clsx("panel", className)}
+      className={clsx("card", className)}
       {...rest}
     >
       {children}
@@ -34,10 +34,10 @@ export function Panel({ className, children, delay = 0, ...rest }) {
 
 export function PanelHead({ title, icon: Icon, children }) {
   return (
-    <header className="panel-head">
+    <header className="card-head">
       <div className="flex items-center gap-2">
         {Icon ? <Icon size={14} className="text-accent" /> : null}
-        <h2 className="panel-title">{title}</h2>
+        <h2 className="card-title">{title}</h2>
       </div>
       {children ? <div className="flex items-center gap-2">{children}</div> : null}
     </header>
