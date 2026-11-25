@@ -28,8 +28,8 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-dist/
+/build/
+/dist/
 *.egg-info/
 .eggs/
 .pytest_cache/
@@ -40,10 +40,11 @@ coverage.xml
 htmlcov/
 .ipynb_checkpoints/
 
-# Virtual envs (we use conda, but just in case)
-.venv/
-venv/
-env/
+# Virtual envs (we use conda, but just in case). Anchored for the
+# same reason as above: a bare `env/` would match src/env/ too.
+/.venv/
+/venv/
+/env/
 
 # ─────────────────────────────────────────────────────────────
 # Data — tracked by DVC, never by Git
@@ -68,16 +69,20 @@ data/processed/*
 # ─────────────────────────────────────────────────────────────
 # Models & artifacts
 # ─────────────────────────────────────────────────────────────
-models/
+# NOTE the leading slash. An unanchored `models/` matches a directory
+# called "models" at ANY depth, which silently excluded the entire
+# src/models/ source package from the repository. Anchor every
+# generated-output directory to the repo root.
+/models/
 *.pkl
 *.joblib
 *.onnx
 *.pt
 *.pth
-mlruns/
-mlartifacts/
-.mlflow/
-bentoml/
+/mlruns/
+/mlartifacts/
+/.mlflow/
+/bentoml/
 
 # ─────────────────────────────────────────────────────────────
 # Reports (generated)

@@ -55,6 +55,11 @@ COPY --chown=appuser:appuser src/data/cities.py         src/data/cities.py
 COPY --chown=appuser:appuser src/data/openmeteo.py      src/data/openmeteo.py
 COPY --chown=appuser:appuser src/features/              src/features/
 COPY --chown=appuser:appuser src/serving/               src/serving/
+# Needed only when MODEL_SOURCE=registry: model_loader pulls the
+# Production model through src.models.tracking.configure(). Without
+# these the registry path raises ImportError inside the container.
+COPY --chown=appuser:appuser src/models/__init__.py     src/models/__init__.py
+COPY --chown=appuser:appuser src/models/tracking.py     src/models/tracking.py
 COPY --chown=appuser:appuser configs/                   configs/
 COPY --chown=appuser:appuser data/reference/            data/reference/
 
