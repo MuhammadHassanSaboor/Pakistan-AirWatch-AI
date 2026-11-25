@@ -138,12 +138,28 @@ three people reporting incomparable numbers.
 
 ### Results so far
 
-| Model | test MAE | vs persistence | Gate |
-|---|---|---|---|
-| **XGBoost** d8 lr0.05 n600 | **6.80** | **+36.9%** | **PASS** |
-| persistence (reference) | 10.775 | — | FAIL (by definition) |
-| rolling_mean | 11.011 | −2.2% | FAIL |
-| seasonal_naive | 13.690 | −27.1% | FAIL |
+Trained on 84 cities / 11.3 M feature rows. Test window is
+2026-01-01 → today, which contains a full smog season.
+
+| Model | test MAE | test R² | vs persistence | Gate |
+|---|---|---|---|---|
+| **XGBoost** d8 lr0.05 n400 | **8.247** | **0.800** | **+41.3%** | **PASS** |
+| persistence (reference) | 14.040 | — | — | FAIL (by definition) |
+
+Error by lead time, which a single averaged number would hide:
+
+| Horizon | MAE (µg/m³) |
+|---|---|
+| +1 h | 2.63 |
+| +6 h | 9.25 |
+| +12 h | 10.39 |
+| +24 h | 10.73 |
+
+Earlier run on the first 36 cities: MAE 6.80, +36.9%. The absolute
+error rose with the larger city set because it adds heavily polluted
+Punjab and Sindh cities — the baseline rose too (10.78 → 14.04), and
+the model's *relative* advantage improved. This is why the baseline is
+logged on every run: an absolute MAE means nothing on its own.
 
 The three baselines *failing* the quality gate is the gate working
 correctly: a baseline is a yardstick, never a deployable model.

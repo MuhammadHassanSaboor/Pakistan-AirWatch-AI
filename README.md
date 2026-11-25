@@ -24,14 +24,22 @@ ahead**, from free public data, with no API keys.
 
 | | |
 |---|---|
-| Cities | 134, covering all 7 administrative units |
+| Cities | 134 defined, covering all 7 administrative units |
 | Data | 2022-08-05 → today, hourly |
 | Model | XGBoost, one global model, `horizon` as a feature |
-| **Test MAE** | **6.80 µg/m³** |
-| Persistence baseline | 10.78 µg/m³ |
-| **Improvement** | **+36.9%** |
+| **Test MAE** | **8.25 µg/m³** |
+| Persistence baseline | 14.04 µg/m³ |
+| **Improvement** | **+41.3%** |
+| Test R² | 0.800 |
+| MAE at +1h / +24h | 2.63 / 10.73 µg/m³ |
 | Features | 100 |
-| Training rows | 3.56 M |
+| Feature rows | 11.3 M |
+
+The model is trained on the 84 cities backfilled so far but serves all
+134, because city identity is encoded continuously (latitude,
+longitude, elevation, log-population) rather than as a categorical —
+there is no per-city parameter that could be missing. Cities outside
+the training set carry additional uncertainty, and the report says so.
 
 ---
 
