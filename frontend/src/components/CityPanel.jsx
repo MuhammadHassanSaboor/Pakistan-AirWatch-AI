@@ -22,20 +22,28 @@ import {
 
 function Metric({ icon: Icon, label, value, unit }) {
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-ink-500">
+    <div className="rounded-lg border border-line bg-raised p-2.5">
+      <div className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-fg-faint">
         <Icon size={11} />
         {label}
       </div>
-      <div className="mt-1 font-mono text-sm font-semibold tabular-nums text-ink-100">
+      <div className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
         {value}
-        {unit ? <span className="ml-1 text-[10px] text-ink-500">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-2xs text-fg-faint">{unit}</span> : null}
       </div>
     </div>
   );
 }
 
-export default function CityPanel({ cityId, data, loading, error, onClose, onRetry }) {
+export default function CityPanel({
+  cityId,
+  data,
+  loading,
+  error,
+  onClose,
+  onRetry,
+  theme,
+}) {
   return (
     <AnimatePresence mode="wait">
       {cityId ? (
@@ -53,6 +61,7 @@ export default function CityPanel({ cityId, data, loading, error, onClose, onRet
             error={error}
             onClose={onClose}
             onRetry={onRetry}
+            theme={theme}
           />
         </motion.aside>
       ) : null}
@@ -60,7 +69,7 @@ export default function CityPanel({ cityId, data, loading, error, onClose, onRet
   );
 }
 
-function Content({ data, loading, error, onClose, onRetry }) {
+function Content({ data, loading, error, onClose, onRetry, theme }) {
   if (error) {
     return (
       <>
@@ -109,7 +118,7 @@ function Content({ data, loading, error, onClose, onRetry }) {
         {/* current reading */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+            <span className="text-2xs font-semibold uppercase tracking-wider text-fg-faint">
               Latest estimate
             </span>
             <SourceBadge
@@ -134,7 +143,7 @@ function Content({ data, loading, error, onClose, onRetry }) {
                   >
                     {fmtNumber(latest.pm2_5)}
                   </span>
-                  <span className="text-xs text-ink-400">{UNIT}</span>
+                  <span className="text-xs text-fg-subtle">{UNIT}</span>
                 </div>
                 <div
                   className="mt-1.5 text-xs font-semibold"
@@ -144,15 +153,15 @@ function Content({ data, loading, error, onClose, onRetry }) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wider text-ink-500">
+                <div className="text-2xs uppercase tracking-wider text-fg-faint">
                   AQI
                 </div>
-                <div className="font-mono text-xl font-bold text-ink-100">
+                <div className="font-mono text-xl font-bold text-fg">
                   {pm25ToAqi(latest.pm2_5) ?? "—"}
                 </div>
               </div>
             </div>
-            <div className="mt-2.5 border-t border-white/[0.07] pt-2 text-[10px] text-ink-500">
+            <div className="mt-2.5 border-t border-line pt-2 text-2xs text-fg-faint">
               Observed {fmtTime(latest.timestamp)}
             </div>
           </div>
@@ -162,7 +171,7 @@ function Content({ data, loading, error, onClose, onRetry }) {
         {headline ? (
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-fg-faint">
                 Our forecast &middot; +{headline.horizon}h
               </span>
               <SourceBadge
@@ -172,14 +181,14 @@ function Content({ data, loading, error, onClose, onRetry }) {
             </div>
             <div className="flex items-center justify-between rounded-xl border border-accent/25 bg-accent/[0.07] p-3">
               <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-2xl font-bold tabular-nums text-accent-soft">
+                <span className="font-mono text-2xl font-bold tabular-nums text-accent">
                   {fmtNumber(headline.pm2_5_pred)}
                 </span>
-                <span className="text-[10px] text-ink-400">{UNIT}</span>
+                <span className="text-2xs text-fg-subtle">{UNIT}</span>
               </div>
-              <div className="text-right text-[10px] leading-tight text-ink-400">
+              <div className="text-right text-2xs leading-tight text-fg-subtle">
                 <div>{headline.aqi_category}</div>
-                <div className="text-ink-500">
+                <div className="text-fg-faint">
                   valid {fmtTime(headline.valid_time)}
                 </div>
               </div>
@@ -189,7 +198,7 @@ function Content({ data, loading, error, onClose, onRetry }) {
 
         {/* weather context */}
         <section>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+          <div className="mb-2 text-2xs font-semibold uppercase tracking-wider text-fg-faint">
             Conditions
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -222,16 +231,17 @@ function Content({ data, loading, error, onClose, onRetry }) {
 
         {/* trend */}
         <section>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+          <div className="mb-1 text-2xs font-semibold uppercase tracking-wider text-fg-faint">
             Recent history &amp; forecast
           </div>
           <TrendChart
             observed={data.observed}
             providerForecast={data.provider_forecast}
             modelPredictions={data.model_predictions}
-            height={230}
+            height={250}
+            theme={theme}
           />
-          <p className="mt-1 text-[10px] leading-relaxed text-ink-500">
+          <p className="mt-1 text-2xs leading-relaxed text-fg-faint">
             Grey is the reanalysis estimate, dotted blue is the provider&rsquo;s own
             forecast, teal is our model. They are shown separately on purpose
             &mdash; our prediction is not the same thing as a measurement.
@@ -239,7 +249,7 @@ function Content({ data, loading, error, onClose, onRetry }) {
         </section>
 
         {/* city facts */}
-        <section className="grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3">
+        <section className="grid grid-cols-2 gap-2 border-t border-line pt-3">
           <Metric
             icon={Users}
             label="Population"
@@ -251,11 +261,11 @@ function Content({ data, loading, error, onClose, onRetry }) {
             value={fmtNumber(city.elevation_m, 0)}
             unit="m"
           />
-          <div className="col-span-2 rounded-lg border border-white/[0.06] bg-white/[0.03] p-2.5">
-            <div className="text-[10px] uppercase tracking-wider text-ink-500">
+          <div className="col-span-2 rounded-lg border border-line bg-raised p-2.5">
+            <div className="text-2xs uppercase tracking-wider text-fg-faint">
               Coordinates
             </div>
-            <div className="mt-1 font-mono text-xs text-ink-200">
+            <div className="mt-1 font-mono text-xs text-fg">
               {fmtNumber(city.latitude, 4)}&deg;N, {fmtNumber(city.longitude, 4)}&deg;E
             </div>
           </div>
@@ -269,17 +279,17 @@ function Head({ title, subtitle, onClose }) {
   return (
     <header className="panel-head shrink-0">
       <div className="min-w-0">
-        <h2 className="truncate text-sm font-bold tracking-tight text-white">
+        <h2 className="truncate text-sm font-bold tracking-tight text-fg">
           {title}
         </h2>
         {subtitle ? (
-          <p className="text-[11px] text-ink-500">{subtitle}</p>
+          <p className="text-xs text-fg-faint">{subtitle}</p>
         ) : null}
       </div>
       <button
         type="button"
         onClick={onClose}
-        className="rounded-md p-1 text-ink-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+        className="rounded-md p-1 text-fg-subtle transition-colors hover:bg-raised hover:text-fg"
         aria-label="Close panel"
       >
         <X size={15} />

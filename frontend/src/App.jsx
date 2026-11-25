@@ -29,6 +29,7 @@ import Footer from "./components/Footer";
 
 import { api } from "./api/client";
 import { useApi, usePolling } from "./hooks/useApi";
+import { useTheme } from "./hooks/useTheme";
 
 const HORIZONS = [1, 6, 12, 24];
 
@@ -37,6 +38,7 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState(null);
   const [showLabels, setShowLabels] = useState(true);
   const [resetSignal, setResetSignal] = useState(0);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const health = useApi(() => api.health(), []);
   const modelInfo = useApi(() => api.modelInfo(), []);
@@ -81,24 +83,30 @@ export default function App() {
   if (apiDown) {
     return (
       <div className="flex min-h-screen flex-col">
-        <Header health={null} modelInfo={null} onRefresh={refreshAll} />
+        <Header
+          health={null}
+          modelInfo={null}
+          onRefresh={refreshAll}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
         <main className="flex flex-1 items-center justify-center p-6">
           <Panel className="w-full max-w-lg">
             <ErrorState error={health.error} onRetry={refreshAll} />
-            <div className="space-y-3 border-t border-white/[0.06] px-6 py-5 text-xs leading-relaxed text-ink-400">
-              <p className="font-medium text-ink-300">Start the API:</p>
-              <pre className="overflow-x-auto rounded-lg bg-ink-950 p-3 font-mono text-[11px] text-accent-soft">
+            <div className="space-y-3 border-t border-line px-6 py-5 text-xs leading-relaxed text-fg-subtle">
+              <p className="font-medium text-fg-muted">Start the API:</p>
+              <pre className="overflow-x-auto rounded-lg bg-canvas p-3 font-mono text-xs text-accent">
                 {`conda activate airwatch
 python -m src.serving.app`}
               </pre>
               <p>
                 It should print{" "}
-                <span className="font-mono text-ink-300">
+                <span className="font-mono text-fg-muted">
                   Running on http://127.0.0.1:5001
                 </span>
                 . If another program already owns that port, change{" "}
-                <span className="font-mono text-ink-300">API_PORT</span> in{" "}
-                <span className="font-mono text-ink-300">.env</span> — the
+                <span className="font-mono text-fg-muted">API_PORT</span> in{" "}
+                <span className="font-mono text-fg-muted">.env</span> — the
                 frontend proxy reads the same value.
               </p>
             </div>
@@ -115,6 +123,8 @@ python -m src.serving.app`}
         modelInfo={modelInfo.data}
         onRefresh={refreshAll}
         refreshing={forecast.loading || stats.loading}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main className="mx-auto w-full max-w-[1800px] flex-1 space-y-4 px-4 py-5 sm:px-6">
@@ -134,8 +144,8 @@ python -m src.serving.app`}
               />
             </PanelHead>
 
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
-              <SlidersHorizontal size={13} className="text-ink-600" />
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
+              <SlidersHorizontal size={13} className="text-fg-faint" />
               <CitySearch
                 cities={cities.data?.cities}
                 onSelect={setSelectedCity}
@@ -153,12 +163,12 @@ python -m src.serving.app`}
                 <motion.span
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="chip !border-accent/35 !bg-accent/12 !text-accent-soft"
+                  className="chip !border-accent/35 !bg-accent/12 !text-accent"
                 >
                   {selectedCityName}
                 </motion.span>
               ) : null}
-              <span className="ml-auto hidden text-[11px] text-ink-600 lg:inline">
+              <span className="ml-auto hidden text-xs text-fg-faint lg:inline">
                 click any city for detail
               </span>
             </div>
@@ -178,6 +188,7 @@ python -m src.serving.app`}
                   onSelectCity={setSelectedCity}
                   showLabels={showLabels}
                   resetSignal={resetSignal}
+                  theme={theme}
                 />
               )}
             </div>
@@ -192,6 +203,7 @@ python -m src.serving.app`}
                 error={history.error}
                 onClose={() => setSelectedCity(null)}
                 onRetry={history.refetch}
+                theme={theme}
               />
             ) : (
               <Panel delay={0.1}>
@@ -200,8 +212,8 @@ python -m src.serving.app`}
                   bands={legend.data?.bands}
                   standard={legend.data?.standard}
                 />
-                <div className="border-t border-white/[0.06] px-4 py-3">
-                  <p className="text-[11px] leading-relaxed text-ink-400">
+                <div className="border-t border-line px-4 py-3">
+                  <p className="text-xs leading-relaxed text-fg-subtle">
                     Select a city on the map to compare its recent history, the
                     provider&rsquo;s own forecast and our model&rsquo;s
                     prediction side by side.
@@ -216,7 +228,7 @@ python -m src.serving.app`}
                 {forecast.loading ? (
                   <Skeleton className="m-2 h-52" />
                 ) : (
-                  <ProvinceChart features={features} height={250} />
+                  <ProvinceChart features={features} height={260} theme={theme} />
                 )}
               </div>
             </Panel>
@@ -239,8 +251,9 @@ python -m src.serving.app`}
                 <TopCitiesChart
                   features={features}
                   topN={12}
-                  height={310}
+                  height={340}
                   onSelect={setSelectedCity}
+                  theme={theme}
                 />
               )}
             </div>
@@ -254,7 +267,7 @@ python -m src.serving.app`}
               {forecast.loading ? (
                 <Skeleton className="m-2 h-64" />
               ) : (
-                <DistributionChart features={features} height={310} />
+                <DistributionChart features={features} height={340} theme={theme} />
               )}
             </div>
           </Panel>

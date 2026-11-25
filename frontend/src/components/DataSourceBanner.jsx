@@ -87,23 +87,23 @@ export default function DataSourceBanner({ health }) {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-xs font-semibold">{state.label}</span>
             {cache?.fetched_at ? (
-              <span className="text-[11px] opacity-70">
+              <span className="text-xs opacity-70">
                 &middot; loaded {fmtRelative(cache.fetched_at)}
               </span>
             ) : null}
             {cache?.cities ? (
-              <span className="text-[11px] opacity-70">
+              <span className="text-xs opacity-70">
                 &middot; {cache.cities} cities
               </span>
             ) : null}
           </div>
 
-          <p className="mt-0.5 text-[11px] leading-relaxed opacity-80">
+          <p className="mt-0.5 text-xs leading-relaxed opacity-80">
             {state.detail}
           </p>
 
           {cache?.upstream_error ? (
-            <p className="mt-1 font-mono text-[10px] leading-relaxed opacity-55">
+            <p className="mt-1 font-mono text-2xs leading-relaxed opacity-55">
               {cache.upstream_error}
             </p>
           ) : null}

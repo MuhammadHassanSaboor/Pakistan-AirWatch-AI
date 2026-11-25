@@ -2,9 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════
+   Theme tokens
+
+   Both palettes are tuned for contrast, not for looking moody.
+   Body text clears WCAG AA against its surface in each theme; the
+   previous UI used ~11px text at low contrast almost everywhere,
+   which is what made the page hard to read.
+   ═══════════════════════════════════════════════════════════ */
+
 @layer base {
-  :root {
+  :root,
+  [data-theme="dark"] {
+    --c-canvas: 9 13 22; /* #090D16 */
+    --c-surface: 17 24 38; /* #111826 */
+    --c-raised: 25 34 51; /* #192233 */
+    --c-sunken: 13 18 29; /* #0D121D */
+    --c-line: 42 54 74;
+    --c-line-strong: 62 78 102;
+
+    --c-fg: 237 242 249; /* near-white  ~15:1 */
+    --c-fg-muted: 176 189 207; /* ~8.5:1 */
+    --c-fg-subtle: 134 149 170; /* ~5.4:1 */
+    --c-fg-faint: 100 114 135;
+
+    --c-accent: 20 184 166;
+    --c-accent-soft: 61 212 195;
+    --c-accent-strong: 13 148 136;
+
+    --c-ok: 52 199 123;
+    --c-warn: 240 180 41;
+    --c-danger: 242 85 80;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -14px rgb(0 0 0 / 0.65);
+    --shadow-raised: 0 2px 6px rgb(0 0 0 / 0.35), 0 18px 40px -18px rgb(0 0 0 / 0.7);
+
+    --glow-a: rgba(20, 184, 166, 0.1);
+    --glow-b: rgba(56, 130, 246, 0.08);
+
     color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    --c-canvas: 243 246 250; /* #F3F6FA */
+    --c-surface: 255 255 255;
+    --c-raised: 248 250 253;
+    --c-sunken: 237 242 248;
+    --c-line: 219 227 238;
+    --c-line-strong: 190 202 218;
+
+    --c-fg: 14 23 38; /* ~16:1 on white */
+    --c-fg-muted: 62 77 99; /* ~8.9:1 */
+    --c-fg-subtle: 95 112 136; /* ~5.1:1 */
+    --c-fg-faint: 133 148 170;
+
+    --c-accent: 13 148 136;
+    --c-accent-soft: 15 118 110;
+    --c-accent-strong: 17 94 89;
+
+    --c-ok: 22 143 87;
+    --c-warn: 180 124 10;
+    --c-danger: 203 48 44;
+
+    --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 8px 24px -12px rgb(15 23 42 / 0.16);
+    --shadow-raised: 0 2px 6px rgb(15 23 42 / 0.07), 0 16px 36px -16px rgb(15 23 42 / 0.2);
+
+    --glow-a: rgba(13, 148, 136, 0.07);
+    --glow-b: rgba(56, 130, 246, 0.06);
+
+    color-scheme: light;
   }
 
   html,
@@ -14,76 +80,82 @@
   }
 
   body {
-    @apply bg-ink-950 text-ink-100 font-sans antialiased;
-    /* A faint two-point glow keeps a flat dark page from looking dead. */
+    @apply bg-canvas text-fg font-sans text-sm antialiased;
     background-image:
-      radial-gradient(
-        900px 500px at 12% -8%,
-        rgba(20, 184, 166, 0.09),
-        transparent 60%
-      ),
-      radial-gradient(
-        800px 460px at 92% 4%,
-        rgba(56, 130, 246, 0.07),
-        transparent 62%
-      );
+      radial-gradient(900px 520px at 10% -10%, var(--glow-a), transparent 60%),
+      radial-gradient(820px 460px at 94% 2%, var(--glow-b), transparent 62%);
     background-attachment: fixed;
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease;
+  }
+
+  /* Tabular figures everywhere numbers are compared. */
+  .tnum,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 
   ::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-ink-700 rounded-full;
+    @apply rounded-full bg-line-strong/60;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-ink-600;
+    @apply bg-line-strong;
   }
 
   *:focus-visible {
-    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-ink-950;
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   Components
+   ═══════════════════════════════════════════════════════════ */
+
 @layer components {
   .panel {
-    @apply rounded-2xl border border-white/[0.07] bg-ink-900/70 shadow-panel backdrop-blur-xl;
+    @apply rounded-card border border-line bg-surface shadow-card;
   }
 
   .panel-head {
-    @apply flex items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3.5;
+    @apply flex items-center justify-between gap-3 border-b border-line px-5 py-3.5;
   }
 
+  /* Section labels. Uppercase + tracking reads as a label rather than
+     shrunken body text, so it can stay small without hurting. */
   .panel-title {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400;
+    @apply text-2xs font-semibold uppercase tracking-[0.1em] text-fg-subtle;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10
-           bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-ink-300;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line
+           bg-raised px-2.5 py-1 text-2xs font-medium text-fg-muted;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-white/10
-           bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-ink-200
-           transition-all duration-200 hover:border-white/20 hover:bg-white/[0.08]
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line
+           bg-raised px-3 py-1.5 text-xs font-medium text-fg-muted
+           transition-all duration-150 hover:border-line-strong hover:text-fg
            active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .btn-accent {
-    @apply border-accent/40 bg-accent/15 text-accent-soft hover:border-accent/60 hover:bg-accent/25;
+    @apply border-accent/40 bg-accent/12 text-accent hover:border-accent/60 hover:bg-accent/20;
   }
 
-  .stat-value {
-    @apply font-mono text-3xl font-semibold tracking-tight tabular-nums;
+  .card-value {
+    @apply font-mono text-4xl font-semibold leading-none tracking-tight;
   }
 
   .skeleton {
-    @apply relative overflow-hidden rounded-lg bg-white/[0.05];
+    @apply relative overflow-hidden rounded-lg bg-raised;
   }
   .skeleton::after {
     content: "";
@@ -91,54 +163,69 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.07),
+      rgb(var(--c-fg) / 0.06),
       transparent
     );
   }
 }
 
-/* ── Leaflet overrides: the default theme is bright and dated ── */
+/* ═══════════════════════════════════════════════════════════
+   Leaflet — themed to match
+   ═══════════════════════════════════════════════════════════ */
+
 .leaflet-container {
-  @apply bg-ink-950 font-sans;
+  @apply bg-sunken font-sans;
   outline: none;
 }
 
 .leaflet-control-zoom a {
-  @apply !border-white/10 !bg-ink-800/90 !text-ink-200 !backdrop-blur;
+  @apply !border-line !bg-surface/95 !text-fg-muted !backdrop-blur;
 }
 .leaflet-control-zoom a:hover {
-  @apply !bg-ink-700 !text-white;
+  @apply !bg-raised !text-fg;
 }
 
 .leaflet-control-attribution {
-  @apply !bg-ink-900/85 !text-[10px] !text-ink-400 !backdrop-blur;
+  @apply !bg-surface/90 !text-[10px] !text-fg-faint !backdrop-blur;
 }
 .leaflet-control-attribution a {
-  @apply !text-accent-soft;
+  @apply !text-accent;
 }
 
-.leaflet-popup-content-wrapper {
-  @apply !rounded-xl !border !border-white/10 !bg-ink-850/95 !text-ink-100 !shadow-panel !backdrop-blur-xl;
+.leaflet-popup-content-wrapper,
+.leaflet-tooltip {
+  @apply !rounded-xl !border !border-line !bg-surface !text-fg !shadow-raised;
 }
 .leaflet-popup-tip {
-  @apply !bg-ink-850;
+  @apply !bg-surface;
 }
 .leaflet-popup-content {
   @apply !m-0;
 }
-.leaflet-popup-close-button {
-  @apply !text-ink-400 hover:!text-white;
+
+/* Permanent PM2.5 chips beside each marker. The solid plate keeps
+   them legible over satellite imagery as well as flat tiles. */
+.airwatch-value-label {
+  @apply !rounded-md !border !border-line !bg-surface/92 !px-1.5 !py-0.5
+         !font-mono !text-[11px] !font-bold !leading-none !shadow-none;
+}
+.airwatch-value-label::before {
+  display: none;
 }
 
-/* Plotly's modebar is light by default and clashes badly. */
+.leaflet-control-scale-line {
+  @apply !border-line-strong !bg-surface/85 !text-[10px] !text-fg-muted !backdrop-blur;
+}
+
+/* Plotly's modebar defaults clash with both themes. */
 .js-plotly-plot .modebar {
   background: transparent !important;
 }
 .js-plotly-plot .modebar-btn path {
-  fill: #64748b !important;
+  fill: rgb(var(--c-fg-faint)) !important;
 }
 .js-plotly-plot .modebar-btn:hover path {
-  fill: #2dd4bf !important;
+  fill: rgb(var(--c-accent)) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

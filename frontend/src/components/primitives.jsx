@@ -113,8 +113,8 @@ export function ErrorState({ error, onRetry, compact = false }) {
         </svg>
       </div>
       <div>
-        <p className="text-sm font-medium text-ink-200">Could not load this</p>
-        <p className="mt-1 max-w-sm text-xs leading-relaxed text-ink-400">
+        <p className="text-sm font-medium text-fg">Could not load this</p>
+        <p className="mt-1 max-w-sm text-xs leading-relaxed text-fg-subtle">
           {error?.message ?? "Unexpected error."}
         </p>
       </div>
@@ -130,9 +130,9 @@ export function ErrorState({ error, onRetry, compact = false }) {
 export function EmptyState({ title, hint, icon: Icon }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
-      {Icon ? <Icon size={22} className="text-ink-500" /> : null}
-      <p className="text-sm font-medium text-ink-300">{title}</p>
-      {hint ? <p className="max-w-xs text-xs text-ink-500">{hint}</p> : null}
+      {Icon ? <Icon size={22} className="text-fg-faint" /> : null}
+      <p className="text-sm font-medium text-fg-muted">{title}</p>
+      {hint ? <p className="max-w-xs text-xs text-fg-faint">{hint}</p> : null}
     </div>
   );
 }
@@ -142,10 +142,10 @@ export function EmptyState({ title, hint, icon: Icon }) {
    element is an explicit requirement, not decoration. */
 
 const TONES = {
-  accent: "border-accent/35 bg-accent/12 text-accent-soft",
+  accent: "border-accent/35 bg-accent/12 text-accent",
   blue: "border-sky-400/35 bg-sky-400/12 text-sky-300",
   green: "border-emerald-400/35 bg-emerald-400/12 text-emerald-300",
-  slate: "border-white/12 bg-white/[0.05] text-ink-300",
+  slate: "border-line bg-raised text-fg-muted",
 };
 
 export function SourceBadge({ label, tone = "slate", title }) {
@@ -154,7 +154,7 @@ export function SourceBadge({ label, tone = "slate", title }) {
       title={title}
       className={clsx(
         "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5",
-        "text-[10px] font-semibold uppercase tracking-wider",
+        "text-2xs font-semibold uppercase tracking-wider",
         TONES[tone] ?? TONES.slate,
       )}
     >

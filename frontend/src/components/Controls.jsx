@@ -13,8 +13,8 @@ import { UNIT } from "../lib/format";
 export function HorizonSelector({ horizons, value, onChange, disabled }) {
   return (
     <div className="flex items-center gap-2">
-      <Clock size={13} className="text-ink-500" />
-      <div className="relative flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+      <Clock size={13} className="text-fg-faint" />
+      <div className="relative flex rounded-lg border border-line bg-raised p-0.5">
         {horizons.map((h) => {
           const active = h === value;
           return (
@@ -25,7 +25,7 @@ export function HorizonSelector({ horizons, value, onChange, disabled }) {
               onClick={() => onChange(h)}
               className={clsx(
                 "relative z-10 rounded-md px-3 py-1 text-xs font-semibold transition-colors duration-200",
-                active ? "text-ink-950" : "text-ink-300 hover:text-white",
+                active ? "text-canvas" : "text-fg-muted hover:text-fg",
                 disabled && "cursor-not-allowed opacity-50",
               )}
             >
@@ -65,8 +65,8 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 focus-within:border-accent/50">
-        <Search size={13} className="shrink-0 text-ink-500" />
+      <div className="flex items-center gap-2 rounded-lg border border-line bg-raised px-2.5 py-1.5 focus-within:border-accent/50">
+        <Search size={13} className="shrink-0 text-fg-faint" />
         <input
           type="text"
           value={query}
@@ -77,7 +77,7 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="w-32 bg-transparent text-xs text-ink-100 placeholder:text-ink-500 focus:outline-none sm:w-40"
+          className="w-32 bg-transparent text-xs text-fg placeholder:text-fg-faint focus:outline-none sm:w-40"
         />
         {query ? (
           <button
@@ -86,7 +86,7 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
               setQuery("");
               setOpen(false);
             }}
-            className="text-ink-500 hover:text-white"
+            className="text-fg-faint hover:text-fg"
             aria-label="Clear search"
           >
             <X size={12} />
@@ -99,7 +99,7 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.16 }}
-          className="absolute right-0 z-[1200] mt-1.5 w-60 overflow-hidden rounded-xl border border-white/10 bg-ink-850/95 shadow-panel backdrop-blur-xl"
+          className="absolute right-0 z-[1200] mt-1.5 w-60 overflow-hidden rounded-xl border border-line bg-surface/95 shadow-panel backdrop-blur-xl"
         >
           {matches.map((c) => (
             <li key={c.city_id}>
@@ -113,12 +113,12 @@ export function CitySearch({ cities, onSelect, selectedCity }) {
                 className={clsx(
                   "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors",
                   c.city_id === selectedCity
-                    ? "bg-accent/15 text-accent-soft"
-                    : "text-ink-200 hover:bg-white/[0.06]",
+                    ? "bg-accent/15 text-accent"
+                    : "text-fg hover:bg-raised",
                 )}
               >
                 <span className="font-medium">{c.city_name}</span>
-                <span className="text-[10px] text-ink-500">{c.province}</span>
+                <span className="text-2xs text-fg-faint">{c.province}</span>
               </button>
             </li>
           ))}
@@ -182,10 +182,10 @@ export function Legend({ bands, standard }) {
                 className="h-3 w-3 shrink-0 rounded-sm"
                 style={{ background: b.color }}
               />
-              <span className="flex-1 truncate text-[11px] text-ink-300">
+              <span className="flex-1 truncate text-xs text-fg-muted">
                 {name}
               </span>
-              <span className="shrink-0 font-mono text-[10px] tabular-nums text-ink-500">
+              <span className="shrink-0 font-mono text-2xs tabular-nums text-fg-faint">
                 {upper && Number.isFinite(upper)
                   ? `${lower ?? 0}–${upper}`
                   : `${lower ?? 0}+`}
@@ -195,9 +195,9 @@ export function Legend({ bands, standard }) {
         })}
       </div>
 
-      <p className="mt-3 border-t border-white/[0.06] pt-2 text-[10px] leading-relaxed text-ink-500">
+      <p className="mt-3 border-t border-line pt-2 text-2xs leading-relaxed text-fg-faint">
         Ranges in {UNIT}. Colours follow the{" "}
-        <span className="text-ink-400">{standard ?? "US EPA"}</span> AQI
+        <span className="text-fg-subtle">{standard ?? "US EPA"}</span> AQI
         breakpoints for PM2.5.
       </p>
     </div>
