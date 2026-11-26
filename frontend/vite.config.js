@@ -46,6 +46,17 @@ export default defineConfig(({ mode }) => {
       // and means no third-party key could ever reach the client.
       proxy,
     },
+    // `vite preview` serves the built bundle, and it needs the same
+    // proxy or every API route 404s. It is worth having: the dev
+    // server ships unminified modules one request at a time and runs
+    // React in development mode, where every component does extra
+    // bookkeeping on each render. Judging how the app performs from
+    // `npm run dev` measures the dev server, not the app.
+    preview: {
+      port: 4173,
+      strictPort: false,
+      proxy,
+    },
     build: {
       outDir: "dist",
       sourcemap: false,

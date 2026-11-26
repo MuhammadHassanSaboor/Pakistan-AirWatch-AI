@@ -9,8 +9,8 @@ import DataSourceBanner from "./components/DataSourceBanner";
 import { CitySearch, HorizonSelector, Legend } from "./components/Controls";
 import {
   DistributionChart,
-  ElevationScatter,
-  PopulationScatter,
+  AltitudeProfile,
+  ExposureChart,
   ProvinceChart,
   TopCitiesChart,
 } from "./components/charts";
@@ -32,7 +32,12 @@ function Card({ title, subtitle, action, children, delay = 0, className }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={`card card-hover flex flex-col ${className ?? ""}`}
+      // Analytics sit below the fold, and every one of them holds a
+      // Plotly canvas. `defer-paint` lets the browser skip their layout
+      // and paint until they are scrolled near, which is the difference
+      // between five canvases being re-measured on every resize and
+      // none of them being.
+      className={`card card-hover defer-paint flex flex-col ${className ?? ""}`}
     >
       <header className="card-head">
         <div className="min-w-0">
@@ -330,36 +335,26 @@ python -m src.serving.app`}
         {/* ── relationships: what the bar charts cannot show ── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card
-            title="Does city size drive pollution?"
-            subtitle="Population versus forecast PM2.5 · log scale · click a point"
+            title="Who is actually breathing this?"
+            subtitle="Residents per EPA category, by province"
             delay={0.2}
           >
             {forecast.loading ? (
               <Skeleton className="m-2 h-72" />
             ) : (
-              <PopulationScatter
-                features={features}
-                height={330}
-                onSelect={setSelectedCity}
-                theme={theme}
-              />
+              <ExposureChart features={features} height={330} theme={theme} />
             )}
           </Card>
 
           <Card
             title="Altitude and air quality"
-            subtitle="Highland cities sit in thinner, better-ventilated air"
+            subtitle="Mean PM2.5 per elevation band · shaded area is the range"
             delay={0.25}
           >
             {forecast.loading ? (
               <Skeleton className="m-2 h-72" />
             ) : (
-              <ElevationScatter
-                features={features}
-                height={330}
-                onSelect={setSelectedCity}
-                theme={theme}
-              />
+              <AltitudeProfile features={features} height={330} theme={theme} />
             )}
           </Card>
         </div>

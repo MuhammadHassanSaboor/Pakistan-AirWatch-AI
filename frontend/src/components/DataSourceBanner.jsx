@@ -64,7 +64,14 @@ export default function DataSourceBanner({ health }) {
 
   // Live and fresh is the expected case; saying so on every load would
   // just be noise. Only speak up when the data is not what it seems.
-  if (!source || source === "live") return null;
+  //
+  // "warming" is also silent. /health answers instantly while the
+  // upstream fetch for 134 cities is still running, so a cold process
+  // reports a store that has not loaded yet -- which is not a fault
+  // and must not be announced as one. It resolves to live within a
+  // second or two, and the banner appears only if it resolves to
+  // something worth saying.
+  if (!source || source === "live" || source === "warming") return null;
 
   const state = STATES[source] ?? STATES.none;
   const Icon = state.icon;

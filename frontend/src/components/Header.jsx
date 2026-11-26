@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Activity, Moon, RefreshCw, Sun, Wind } from "lucide-react";
 import clsx from "clsx";
 
+import PakistanFlag from "./PakistanFlag";
 import { EASE } from "./primitives";
 import { fmtRelative } from "../lib/format";
 
@@ -49,12 +50,16 @@ export default function Header({
           <motion.div
             whileHover={{ rotate: 12, scale: 1.06 }}
             transition={{ type: "spring", stiffness: 320, damping: 16 }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-deep shadow-glow"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-strong shadow-glow"
           >
             <Wind size={18} className="text-canvas" strokeWidth={2.4} />
           </motion.div>
           <div className="leading-tight">
-            <h1 className="text-base font-bold tracking-tight text-fg">
+            <h1 className="flex items-center gap-2 text-base font-bold tracking-tight text-fg">
+              {/* The flag sits with the country in the title, which is
+                  the one place it reads as identity rather than
+                  decoration stuck in a corner. */}
+              <PakistanFlag width={26} />
               Pakistan AirWatch <span className="text-accent">AI</span>
             </h1>
             <p className="text-xs text-fg-subtle">

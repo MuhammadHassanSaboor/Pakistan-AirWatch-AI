@@ -176,6 +176,7 @@
       radial-gradient(38% 34% at 78% 8%, var(--glow-b), transparent 64%),
       radial-gradient(46% 40% at 60% 96%, var(--glow-a), transparent 66%);
     animation: aurora 38s ease-in-out infinite alternate;
+    will-change: transform;
   }
 
   @keyframes aurora {
@@ -372,6 +373,156 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Looping animations
+
+   Every indefinite loop on this page is a CSS keyframe, not a
+   JavaScript one. Framer Motion animates by writing inline styles from
+   a requestAnimationFrame callback, which runs on the main thread --
+   the same thread that handles scrolling. With nine AQI scenes, a
+   breathing card tint, two pulsing chips and two Ken Burns photos all
+   looping at once, that thread was never idle, and scrolling stuttered
+   even though nothing was actually recomputing.
+
+   These run on the compositor instead and cost the main thread nothing
+   after the first frame. Framer Motion is still used for everything
+   that animates ONCE -- entrances, hovers, presses, layout -- which is
+   what it is good at and which does not loop.
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes aqi-drift {
+  0%,
+  100% {
+    transform: translateX(-16px);
+  }
+  50% {
+    transform: translateX(16px);
+  }
+}
+
+@keyframes aqi-rise {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateY(-9px);
+    opacity: 0.85;
+  }
+}
+
+@keyframes aqi-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes aqi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.08;
+  }
+  50% {
+    opacity: 0.16;
+  }
+}
+
+@keyframes chip-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes ken-burns {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+@keyframes flag-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-1.6deg);
+  }
+  75% {
+    transform: rotate(1.6deg);
+  }
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    /* The track holds the list twice, so travelling exactly half its
+       width lands on an identical frame and the loop is seamless. */
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.aqi-drift {
+  animation: aqi-drift 11s ease-in-out infinite;
+}
+.aqi-rise {
+  animation: aqi-rise 7s ease-in-out infinite;
+}
+.aqi-breathe {
+  animation: aqi-breathe 5s ease-in-out infinite;
+}
+.aqi-spin {
+  animation: aqi-spin 60s linear infinite;
+}
+.soft-pulse {
+  animation: soft-pulse 7s ease-in-out infinite;
+}
+.chip-beat {
+  animation: chip-beat 3.5s ease-in-out infinite;
+}
+.ken-burns {
+  animation: ken-burns 34s ease-in-out infinite;
+}
+.flag-wave {
+  animation: flag-wave 6s ease-in-out infinite;
+}
+.ticker-track {
+  animation: ticker-scroll 60s linear infinite;
+  will-change: transform;
+}
+
+/* Analytics sit below the fold. `content-visibility` lets the browser
+   skip their layout and paint until they are scrolled near, which is
+   the difference between five Plotly canvases being measured on every
+   resize and none of them being. The size hint stops the scrollbar
+   jumping as they are realised. */
+.defer-paint {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Leaflet
    ═══════════════════════════════════════════════════════════ */
 
@@ -437,6 +588,30 @@
   background-color: rgb(var(--c-surface) / 0.8) !important;
 }
 
+/* Place labels drawn straight onto the map: no plate, no border --
+   the name alone, with a halo so it survives any basemap underneath. */
+.airwatch-place-label {
+  background: transparent !important;
+  border: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.airwatch-place-label span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: #f8fafc;
+  text-shadow:
+    0 0 3px rgb(0 0 0 / 0.95),
+    0 0 7px rgb(0 0 0 / 0.85),
+    0 1px 2px rgb(0 0 0 / 0.9);
+}
+
 /* Plotly chrome */
 .js-plotly-plot .modebar {
   background: transparent !important;
@@ -476,5 +651,13 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The blanket rule above would collapse an infinite marquee into a
+     single 0.01ms pass, snapping it to its end state. A loop asked to
+     stop should stop where it is and stay scrollable by hand. */
+  .ticker-track {
+    animation: none !important;
+    overflow-x: auto;
   }
 }
