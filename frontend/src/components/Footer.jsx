@@ -1,5 +1,7 @@
 import { ExternalLink, Github } from "lucide-react";
 
+import { photoCredits } from "../lib/photos";
+
 /**
  * Attribution is a licence condition, not decoration: Open-Meteo,
  * OpenAQ, PAQI and GeoNames are all CC BY, and the free Open-Meteo
@@ -40,12 +42,44 @@ export default function Footer({ modelInfo }) {
               >
                 PAQI
               </a>{" "}
-              (CC BY 4.0). City coordinates &copy; GeoNames (CC BY 4.0). Base map
-              &copy; OpenStreetMap contributors, &copy; CARTO.
+              (CC BY 4.0). City coordinates &copy; GeoNames (CC BY 4.0). Base
+              maps &copy; OpenStreetMap contributors and Esri.
+            </p>
+            {/* The Unsplash License waives attribution, but a photograph
+                carrying the look of the page has earned its credit. */}
+            <p className="text-xs leading-relaxed text-fg-subtle">
+              Category photography by{" "}
+              {photoCredits().map((p, i, all) => (
+                <span key={p.handle}>
+                  <a
+                    href={`https://unsplash.com/@${p.handle}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-accent hover:underline"
+                  >
+                    {p.by}
+                  </a>
+                  {i < all.length - 2
+                    ? ", "
+                    : i === all.length - 2
+                      ? " and "
+                      : ""}
+                </span>
+              ))}{" "}
+              on{" "}
+              <a
+                href="https://unsplash.com/license"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-accent hover:underline"
+              >
+                Unsplash
+              </a>
+              .
             </p>
             <p className="text-xs leading-relaxed text-fg-faint">
-              Pakistan AirWatch AI is a non-commercial academic MLOps project. It
-              is <strong className="text-fg-subtle">not</strong> an official
+              Pakistan AirWatch AI is a non-commercial academic MLOps project.
+              It is <strong className="text-fg-subtle">not</strong> an official
               public-health warning system and does not provide medical advice.
               Forecast accuracy varies by region: cities without nearby
               monitoring stations carry greater uncertainty than the map alone
