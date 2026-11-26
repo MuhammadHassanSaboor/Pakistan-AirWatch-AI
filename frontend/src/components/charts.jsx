@@ -378,7 +378,7 @@ export function DistributionChart({ features, height = 340, theme }) {
           ? `${edges[i]}–${edges[i + 1]}`
           : `${edges[i]}+`,
       ),
-      names: AQI_BANDS.map((b) => b.short ?? b.name),
+      names: AQI_BANDS.map((b) => b.abbr ?? b.name),
       colors: AQI_BANDS.map((b) => b.color),
       total: values.length,
     };
@@ -430,6 +430,160 @@ export function DistributionChart({ features, height = 340, theme }) {
       config={CONFIG}
       style={{ width: "100%" }}
       useResizeHandler
+    />
+  );
+}
+
+/* ── population vs pollution ─────────────────────────────── */
+
+/**
+ * Does city size drive pollution?
+ *
+ * A scatter answers a question the bar charts cannot: whether the
+ * worst air is simply the biggest cities, or whether smaller places
+ * are just as affected. For Pakistan the answer is interesting —
+ * Punjab's mid-size industrial towns often rank alongside the
+ * megacities, which a "top 12" list hides entirely.
+ *
+ * Population is log-scaled because it spans 25k to 15M; on a linear
+ * axis every city but Karachi and Lahore collapses against zero.
+ */
+export function PopulationScatter({ features, height = 330, onSelect, theme }) {
+  const t = useChartTheme(theme);
+
+  const rows = useMemo(
+    () =>
+      (features ?? []).filter(
+        (f) => f.pm2_5_pred != null && f.population > 0,
+      ),
+    [features],
+  );
+
+  if (rows.length < 5) return null;
+
+  return (
+    <Plot
+      data={[
+        {
+          type: "scatter",
+          mode: "markers",
+          x: rows.map((r) => r.population),
+          y: rows.map((r) => r.pm2_5_pred),
+          marker: {
+            size: rows.map((r) =>
+              Math.max(7, Math.min(26, Math.sqrt(r.population) / 420)),
+            ),
+            color: rows.map((r) => colorForPm25(r.pm2_5_pred)),
+            opacity: 0.82,
+            line: { color: t.line, width: 1 },
+          },
+          customdata: rows.map((r) => [
+            r.city_name ?? r.city_id,
+            r.province,
+            r.aqi_us,
+            r.city_id,
+          ]),
+          hovertemplate:
+            `<b>%{customdata[0]}</b> &middot; %{customdata[1]}<br>` +
+            `%{y:.1f} ${UNIT} &middot; AQI %{customdata[2]}<br>` +
+            `population %{x:,.0f}<extra></extra>`,
+        },
+      ]}
+      layout={{
+        ...t.layout,
+        height,
+        margin: { l: 56, r: 24, t: 16, b: 52 },
+        xaxis: {
+          ...t.axis,
+          type: "log",
+          title: { ...t.axis.title, text: "Population (log scale)" },
+        },
+        yaxis: {
+          ...t.axis,
+          title: { ...t.axis.title, text: `Forecast PM2.5 (${UNIT})` },
+          rangemode: "tozero",
+        },
+      }}
+      config={CONFIG}
+      style={{ width: "100%" }}
+      useResizeHandler
+      onClick={(e) => {
+        const id = e?.points?.[0]?.customdata?.[3];
+        if (id && onSelect) onSelect(id);
+      }}
+    />
+  );
+}
+
+/* ── elevation vs pollution ──────────────────────────────── */
+
+/**
+ * Altitude versus air quality.
+ *
+ * Pakistan spans sea level to 2,600 m, and the relationship is one of
+ * the clearest physical signals in the dataset: highland cities sit in
+ * thinner, better-ventilated air while the Indus plain traps smog
+ * under winter inversions. Plotting it makes the model's behaviour
+ * explainable rather than opaque.
+ */
+export function ElevationScatter({ features, height = 330, onSelect, theme }) {
+  const t = useChartTheme(theme);
+
+  const rows = useMemo(
+    () =>
+      (features ?? []).filter(
+        (f) => f.pm2_5_pred != null && f.elevation_m != null,
+      ),
+    [features],
+  );
+
+  if (rows.length < 5) return null;
+
+  return (
+    <Plot
+      data={[
+        {
+          type: "scatter",
+          mode: "markers",
+          x: rows.map((r) => r.elevation_m),
+          y: rows.map((r) => r.pm2_5_pred),
+          marker: {
+            size: 11,
+            color: rows.map((r) => colorForPm25(r.pm2_5_pred)),
+            opacity: 0.85,
+            line: { color: t.line, width: 1 },
+          },
+          customdata: rows.map((r) => [
+            r.city_name ?? r.city_id,
+            r.province,
+            r.city_id,
+          ]),
+          hovertemplate:
+            `<b>%{customdata[0]}</b> &middot; %{customdata[1]}<br>` +
+            `%{y:.1f} ${UNIT}<br>%{x:,.0f} m elevation<extra></extra>`,
+        },
+      ]}
+      layout={{
+        ...t.layout,
+        height,
+        margin: { l: 56, r: 24, t: 16, b: 52 },
+        xaxis: {
+          ...t.axis,
+          title: { ...t.axis.title, text: "Elevation (m)" },
+        },
+        yaxis: {
+          ...t.axis,
+          title: { ...t.axis.title, text: `Forecast PM2.5 (${UNIT})` },
+          rangemode: "tozero",
+        },
+      }}
+      config={CONFIG}
+      style={{ width: "100%" }}
+      useResizeHandler
+      onClick={(e) => {
+        const id = e?.points?.[0]?.customdata?.[2];
+        if (id && onSelect) onSelect(id);
+      }}
     />
   );
 }

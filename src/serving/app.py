@@ -346,7 +346,18 @@ def create_app(registry: CollectorRegistry | None = None) -> Flask:
             )
 
         meta = cities.set_index("city_id")[
-            ["city_name", "province", "latitude", "longitude", "population"]
+            [
+                "city_name",
+                "province",
+                "latitude",
+                "longitude",
+                "population",
+                # Elevation drives one of the clearest physical signals
+                # in this dataset: highland cities sit in thinner,
+                # better-ventilated air while the Indus plain traps
+                # smog under winter inversions. The dashboard plots it.
+                "elevation_m",
+            ]
         ].to_dict("index")
 
         enriched = []
