@@ -320,3 +320,38 @@ def test_stats_category_counts_use_official_band_names(api_client):
         sum(counts.values())
         == api_client.get("/api/stats").get_json()["cities_reporting"]
     )
+
+
+def test_health_does_not_report_failure_before_any_fetch(monkeypatch):
+    """A store that has never been asked for data has not failed.
+
+    /health only reads status(); it never calls refresh(). On a cold
+    process that left `source` at its initial "none", which the
+    dashboard rendered as "neither the upstream feed nor the local
+    dataset is available" -- alarming, and untrue.
+    """
+    from src.serving.live_features import LiveFeatureStore
+
+    store = LiveFeatureStore.__new__(LiveFeatureStore)
+    store._features = None
+    store._observations = None
+    store._fetched_at = None
+    store._source = "none"
+    store._last_error = None
+
+    status = store.status()
+    assert status["source"] == "warming"
+    assert status["cached"] is False
+
+
+def test_health_reports_none_only_after_a_real_failure():
+    from src.serving.live_features import LiveFeatureStore
+
+    store = LiveFeatureStore.__new__(LiveFeatureStore)
+    store._features = None
+    store._observations = None
+    store._fetched_at = None
+    store._source = "none"
+    store._last_error = "upstream 429 and no local dataset"
+
+    assert store.status()["source"] == "none"

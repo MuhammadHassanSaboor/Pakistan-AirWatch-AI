@@ -138,8 +138,9 @@ export default function AqiGauge({ aqi, size = 184, stroke = 14 }) {
             delay: 0.3,
           }}
         />
-        <circle cx={cx} cy={cy} r={6} fill="rgb(var(--c-surface))" />
-        <circle cx={cx} cy={cy} r={3.5} fill="rgb(var(--c-fg))" />
+        {/* No hub. A pivot dot belongs on a dial whose needle sweeps
+            from the centre; this needle is a tick at the rim, so the
+            dot was just two circles parked behind the AQI numeral. */}
       </svg>
 
       {/* centred readout */}

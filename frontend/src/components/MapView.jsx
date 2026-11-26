@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
   Pane,
   ScaleControl,
@@ -30,6 +31,7 @@ import {
   textOn,
 } from "../lib/aqi";
 import { UNIT, fmtPopulation } from "../lib/format";
+import kashmir from "../data/kashmir.json";
 
 const PK_CENTER = [30.3753, 69.3451];
 const PK_BOUNDS = [
@@ -106,7 +108,7 @@ function FitPakistan({ trigger }) {
 
 function BasemapSwitcher({ value, onChange }) {
   return (
-    <div className="float pointer-events-auto flex p-1">
+    <div className="flex rounded-lg border border-line bg-sunken p-0.5">
       {BASEMAPS.map((b) => {
         const Icon = STYLE_ICONS[b.id] ?? MapIcon;
         const active = b.id === value;
@@ -141,23 +143,95 @@ function BasemapSwitcher({ value, onChange }) {
  *  scrolling to a panel somewhere else on the page. */
 function MapLegend() {
   return (
-    <div className="float pointer-events-auto hidden px-3 py-2.5 md:block">
-      <div className="eyebrow mb-2">PM2.5 · US EPA AQI</div>
-      <div className="flex items-end gap-1">
+    <div className="hidden items-center gap-2 lg:flex">
+      <span className="text-2xs font-medium text-fg-subtle">Good</span>
+      <div className="flex items-center overflow-hidden rounded-md">
         {AQI_BANDS.map((b) => (
           <span
             key={b.name}
-            className="h-2 w-7 rounded-sm transition-transform hover:scale-y-150"
+            className="h-2.5 w-6 transition-transform hover:scale-y-150"
             style={{ background: b.color }}
             title={`${b.name} · AQI ${b.lower}–${b.upper}`}
           />
         ))}
       </div>
-      <div className="mt-1.5 flex justify-between text-[9px] text-fg-faint">
-        <span>Good</span>
-        <span>Hazardous</span>
-      </div>
+      <span className="text-2xs font-medium text-fg-subtle">Hazardous</span>
     </div>
+  );
+}
+
+/* ── Kashmir ─────────────────────────────────────────────── */
+
+/**
+ * The Kashmir region, drawn the way the Government of Pakistan's
+ * official map shows it.
+ *
+ * Geometry is Natural Earth's 10m disputed-areas dataset (public
+ * domain), extracted by scripts/build_kashmir_geojson.py. It is not
+ * approximated by hand: a boundary drawn from memory is wrong in a way
+ * no reviewer can check, and on this subject that is not a cosmetic
+ * defect. Each feature keeps Natural Earth's own administration note,
+ * so the tooltip states the status rather than our paraphrase of it.
+ *
+ * Styling carries the distinction. Pakistan-administered territory
+ * (Azad Jammu & Kashmir, Gilgit-Baltistan) is drawn in the accent as
+ * part of the country. Indian-occupied Jammu & Kashmir is drawn as
+ * disputed: a dashed outline with a hatched fill, the standard
+ * cartographic treatment for territory under dispute.
+ */
+const REGION_STYLES = {
+  pakistan: { stroke: "var(--c-accent)", dash: null, fill: 0.1, weight: 1.6 },
+  occupied: { stroke: "var(--c-warn)", dash: "7 5", fill: 0.14, weight: 1.8 },
+  disputed: {
+    stroke: "var(--c-fg-subtle)",
+    dash: "3 4",
+    fill: 0.1,
+    weight: 1.4,
+  },
+  china: { stroke: "var(--c-fg-faint)", dash: "2 5", fill: 0.07, weight: 1.2 },
+};
+
+function cssColor(variable) {
+  if (typeof document === "undefined") return "#888";
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(variable.replace("var(", "").replace(")", ""))
+    .trim();
+  return raw ? `rgb(${raw})` : "#888";
+}
+
+function KashmirLayer({ themeKey }) {
+  const style = (feature) => {
+    const spec =
+      REGION_STYLES[feature.properties.role] ?? REGION_STYLES.disputed;
+    const colour = cssColor(spec.stroke);
+    return {
+      color: colour,
+      weight: spec.weight,
+      dashArray: spec.dash ?? undefined,
+      fillColor: colour,
+      fillOpacity: spec.fill,
+      interactive: true,
+    };
+  };
+
+  const onEachFeature = (feature, layer) => {
+    const { label, note } = feature.properties;
+    layer.bindTooltip(
+      `<span class="font-semibold">${label}</span>` +
+        (note ? `<br/><span class="opacity-70">${note}</span>` : ""),
+      { direction: "top", sticky: true, className: "airwatch-region-label" },
+    );
+  };
+
+  return (
+    <Pane name="kashmir" style={{ zIndex: 450 }}>
+      <GeoJSON
+        key={`kashmir-${themeKey}`}
+        data={kashmir}
+        style={style}
+        onEachFeature={onEachFeature}
+      />
+    </Pane>
   );
 }
 
@@ -231,120 +305,46 @@ export default function MapView({
   }, [points, zoom, showValues]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl">
-      <MapContainer
-        center={PK_CENTER}
-        zoom={5}
-        minZoom={4}
-        maxZoom={basemap.maxZoom ?? 16}
-        scrollWheelZoom
-        zoomControl
-        className="h-full w-full"
-        preferCanvas
-      >
-        <TileLayer
-          key={`base-${basemap.id}`}
-          url={basemap.url}
-          attribution={basemap.attribution}
-          subdomains={basemap.subdomains ?? "abc"}
-          maxZoom={basemap.maxZoom ?? 16}
-        />
-
-        {showLabels && basemap.labels ? (
-          <Pane
-            name="map-labels"
-            style={{ zIndex: 620, pointerEvents: "none" }}
-          >
-            <TileLayer
-              key={`labels-${basemap.id}`}
-              url={basemap.labels}
-              subdomains={basemap.subdomains ?? "abc"}
-              maxZoom={basemap.maxZoom ?? 16}
-            />
-          </Pane>
-        ) : null}
-
-        <SizeFixer />
-        <ZoomWatcher onZoom={setZoom} />
-        <FlyToCity city={selected} />
-        <FitPakistan trigger={resetSignal} />
-        <ScaleControl position="bottomleft" imperial={false} />
-
-        {points.map((p) => {
-          const isSelected = p.city_id === selectedCity;
-          const isHovered = p.city_id === hovered;
-          const color = colorForPm25(p.pm2_5_pred);
-          const radius = radiusForCity(p.population, zoom);
-          const emphasised = isSelected || isHovered;
-
-          return (
-            <CircleMarker
-              key={p.city_id}
-              center={[p.latitude, p.longitude]}
-              radius={emphasised ? radius * 1.32 : radius}
-              pathOptions={{
-                color: isSelected ? "#FFFFFF" : color,
-                weight: isSelected ? 2.6 : isHovered ? 2 : 1.1,
-                opacity: 1,
-                fillColor: color,
-                fillOpacity: isSelected ? 0.95 : isHovered ? 0.88 : 0.72,
-              }}
-              eventHandlers={{
-                click: () => onSelectCity(p.city_id),
-                mouseover: () => setHovered(p.city_id),
-                mouseout: () => setHovered(null),
-              }}
-            >
-              {labelled.has(p.city_id) && !emphasised ? (
-                <Tooltip
-                  permanent
-                  direction="right"
-                  offset={[radius + 4, 0]}
-                  className="airwatch-value-label"
-                >
-                  <span style={{ color }}>{Math.round(p.pm2_5_pred)}</span>
-                </Tooltip>
-              ) : null}
-
-              <Tooltip direction="top" offset={[0, -8]} opacity={1} sticky>
-                <MarkerTooltip point={p} />
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
-
-      {/* ── floating controls ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[700] flex items-start justify-between gap-3 p-3">
-        <div className="float pointer-events-auto flex items-center gap-2 px-3 py-2">
+    /* The controls used to float ON the map. On a reload they appeared
+       as a scatter of panels over a blank grey rectangle before the
+       tiles arrived, which read as stray cards rather than map
+       furniture -- and the legend and switcher together covered a good
+       part of the country. They live in a toolbar above the map now,
+       so the map itself is nothing but map. */
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
+        <div className="flex items-center gap-2">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-accent" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
           </span>
-          <span className="text-[11px] font-medium text-fg">
+          <span className="text-xs font-semibold text-fg">
             {points.length} cities
           </span>
           {horizon ? (
-            <>
-              <span className="h-3 w-px bg-line" />
-              <span className="font-mono text-[11px] text-fg-subtle">
-                +{horizon}h
-              </span>
-            </>
+            <span className="font-mono text-xs text-fg-subtle">
+              +{horizon}h
+            </span>
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="mx-1 hidden h-4 w-px bg-line sm:block" />
+
+        <MapLegend />
+
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => setShowValues((v) => !v)}
             title="Show PM2.5 values on the map"
             className={clsx(
-              "float pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-[11px] font-medium transition-colors",
-              showValues ? "text-accent" : "text-fg-subtle hover:text-fg",
+              "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              showValues
+                ? "border-accent/35 bg-accent/12 text-accent"
+                : "border-line bg-sunken text-fg-subtle hover:text-fg",
             )}
           >
-            <Tag size={12} />
+            <Tag size={13} />
             <span className="hidden sm:inline">Values</span>
           </button>
 
@@ -352,9 +352,9 @@ export default function MapView({
             type="button"
             onClick={onReset}
             title="Reset the view to the whole country"
-            className="float pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-[11px] font-medium text-fg-subtle transition-colors hover:text-fg"
+            className="flex items-center gap-1.5 rounded-lg border border-line bg-sunken px-2.5 py-1.5 text-xs font-medium text-fg-subtle transition-colors hover:text-fg"
           >
-            <Expand size={12} />
+            <Expand size={13} />
             <span className="hidden sm:inline">Fit</span>
           </button>
 
@@ -362,39 +362,124 @@ export default function MapView({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 right-3 z-[700]">
-        <MapLegend />
-      </div>
+      <div className="relative min-h-0 flex-1">
+        <MapContainer
+          center={PK_CENTER}
+          zoom={5}
+          minZoom={4}
+          maxZoom={basemap.maxZoom ?? 16}
+          scrollWheelZoom
+          zoomControl
+          className="h-full w-full"
+          preferCanvas
+        >
+          <TileLayer
+            key={`base-${basemap.id}`}
+            url={basemap.url}
+            attribution={basemap.attribution}
+            subdomains={basemap.subdomains ?? "abc"}
+            maxZoom={basemap.maxZoom ?? 16}
+          />
 
-      <AnimatePresence>
-        {loading ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="pointer-events-none absolute inset-0 z-[680] flex items-center justify-center bg-canvas/45 backdrop-blur-[3px]"
-          >
-            <div className="float flex items-center gap-3 px-4 py-2.5">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-              <span className="text-xs font-medium text-fg">
-                Generating forecasts&hellip;
-              </span>
+          <KashmirLayer themeKey={theme} />
+
+          {showLabels && basemap.labels ? (
+            <Pane
+              name="map-labels"
+              style={{ zIndex: 620, pointerEvents: "none" }}
+            >
+              <TileLayer
+                key={`labels-${basemap.id}`}
+                url={basemap.labels}
+                subdomains={basemap.subdomains ?? "abc"}
+                maxZoom={basemap.maxZoom ?? 16}
+              />
+            </Pane>
+          ) : null}
+
+          <SizeFixer />
+          <ZoomWatcher onZoom={setZoom} />
+          <FlyToCity city={selected} />
+          <FitPakistan trigger={resetSignal} />
+          <ScaleControl position="bottomleft" imperial={false} />
+
+          {points.map((p) => {
+            const isSelected = p.city_id === selectedCity;
+            const isHovered = p.city_id === hovered;
+            const color = colorForPm25(p.pm2_5_pred);
+            const radius = radiusForCity(p.population, zoom);
+            const emphasised = isSelected || isHovered;
+
+            return (
+              <CircleMarker
+                key={p.city_id}
+                center={[p.latitude, p.longitude]}
+                radius={emphasised ? radius * 1.32 : radius}
+                pathOptions={{
+                  color: isSelected ? "#FFFFFF" : color,
+                  weight: isSelected ? 2.6 : isHovered ? 2 : 1.1,
+                  opacity: 1,
+                  fillColor: color,
+                  fillOpacity: isSelected ? 0.95 : isHovered ? 0.88 : 0.72,
+                }}
+                eventHandlers={{
+                  click: () => onSelectCity(p.city_id),
+                  mouseover: () => setHovered(p.city_id),
+                  mouseout: () => setHovered(null),
+                }}
+              >
+                {labelled.has(p.city_id) && !emphasised ? (
+                  <Tooltip
+                    permanent
+                    direction="right"
+                    offset={[radius + 4, 0]}
+                    className="airwatch-value-label"
+                  >
+                    <span style={{ color }}>{Math.round(p.pm2_5_pred)}</span>
+                  </Tooltip>
+                ) : null}
+
+                <Tooltip direction="top" offset={[0, -8]} opacity={1} sticky>
+                  <MarkerTooltip point={p} />
+                </Tooltip>
+              </CircleMarker>
+            );
+          })}
+        </MapContainer>
+
+        {/* A corner pill, not a full-map blur. Blurring the whole map on
+            every horizon change hid the thing being waited for, and on a
+            reload it was the first thing on screen. */}
+        <AnimatePresence>
+          {loading ? (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="pointer-events-none absolute right-3 top-3 z-[700]"
+            >
+              <div className="float flex items-center gap-2 px-3 py-1.5">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                <span className="text-xs font-medium text-fg">
+                  Forecasting&hellip;
+                </span>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {points.length === 0 && !loading ? (
+          <div className="pointer-events-none absolute inset-0 z-[670] flex items-center justify-center p-6">
+            <div className="float max-w-xs px-4 py-3 text-center">
+              <p className="text-xs font-medium text-fg">No predictions yet</p>
+              <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
+                The API returned no forecasts. Check that a model is loaded and
+                that upstream data is available.
+              </p>
             </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {points.length === 0 && !loading ? (
-        <div className="pointer-events-none absolute inset-0 z-[670] flex items-center justify-center p-6">
-          <div className="float max-w-xs px-4 py-3 text-center">
-            <p className="text-xs font-medium text-fg">No predictions yet</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
-              The API returned no forecasts. Check that a model is loaded and
-              that upstream data is available.
-            </p>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -297,42 +297,40 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
       </div>
 
       <div className="plate relative mt-3 p-3">
-        {/* One band chip, not two.
-            The previous row put the value, its unit AND a band chip on
-            a single line with `ml-auto`. At "Faisalabad / 279.4 /
-            Hazardous" that line cannot fit a half-width card, so the
-            chip was clipped by the card's overflow. The band chip now
-            owns the top-right corner -- it is `shrink-0` with the name
-            allowed to truncate beside it -- and the AQI number, which
-            is always short, sits inline with the value instead. */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-xl font-semibold tracking-tight text-fg">
-              {city?.city_name ?? "—"}
-            </div>
-            <div className="truncate text-xs font-medium text-fg-muted">
-              {city?.province ?? ""}
-            </div>
-          </div>
-          <motion.span
-            className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs
-                       font-bold shadow-sm"
-            style={{ background: band?.color, color: textOn(band?.color) }}
-            animate={{ scale: [1, 1.04, 1] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {band?.abbr}
-          </motion.span>
+        {/* Every element gets its own row, and no row competes for width.
+            Sharing a line was the whole problem: the name had to fight a
+            chip whose width depends on the band ("Good" vs "Very
+            Unhealthy"), so it truncated to "Faisala..."; and the AQI
+            shared the value's line with `flex-wrap`, so it wrapped at
+            three digits and not at two -- the two cards laid out
+            differently purely because of how polluted their city was.
+            Fixed rows mean both cards always look identical. */}
+        <div className="truncate text-xl font-semibold tracking-tight text-fg">
+          {city?.city_name ?? "—"}
+        </div>
+        <div className="truncate text-xs font-medium text-fg-muted">
+          {city?.province ?? ""}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-end gap-x-1.5 gap-y-1">
+        <div className="mt-2 flex items-end gap-1.5">
           {/* The numeral is foreground, not band colour: at Moderate the
               band colour is 1.89:1 on white. */}
           <span className="metric text-[2.25rem] leading-none text-fg">
             {city?.pm2_5?.toFixed(1) ?? "—"}
           </span>
           <span className="pb-1 text-xs font-medium text-fg-muted">{UNIT}</span>
-          <span className="ml-auto shrink-0 pb-1 font-mono text-[13px] font-bold text-fg-muted">
+        </div>
+
+        <div className="mt-2 flex items-center gap-2">
+          <motion.span
+            className="min-w-0 truncate rounded-lg px-2 py-1 text-xs font-bold shadow-sm"
+            style={{ background: band?.color, color: textOn(band?.color) }}
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            {band?.abbr}
+          </motion.span>
+          <span className="ml-auto shrink-0 font-mono text-[13px] font-bold text-fg-muted">
             AQI {city?.aqi_us ?? "—"}
           </span>
         </div>

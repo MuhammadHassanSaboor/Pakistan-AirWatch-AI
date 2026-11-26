@@ -437,6 +437,19 @@
   background-color: rgb(var(--c-surface) / 0.8) !important;
 }
 
+/* Disputed/administered region labels on the map. */
+.airwatch-region-label {
+  @apply !rounded-lg !border !px-2.5 !py-1.5 !text-[11px] !leading-snug !text-fg !shadow-float;
+  border-color: var(--hairline) !important;
+  background-color: rgb(var(--c-surface) / 0.96) !important;
+  backdrop-filter: blur(10px);
+  max-width: 15rem;
+  white-space: normal;
+}
+.airwatch-region-label::before {
+  display: none;
+}
+
 /* Plotly chrome */
 .js-plotly-plot .modebar {
   background: transparent !important;

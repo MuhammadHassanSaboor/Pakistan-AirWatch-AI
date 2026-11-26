@@ -23,7 +23,11 @@ quota is not much of a dashboard, so the store falls back in order:
     1. fresh upstream data            source = "live"
     2. the previous cache, stale      source = "stale_cache"
     3. the local historical dataset   source = "historical"
-    4. nothing -> 503 with a reason
+    4. nothing -> 503 with a reason   source = "none"
+
+Before any of that has been attempted the store reports "warming",
+which is distinct from "none": one means no fetch has happened yet,
+the other means every fetch route was tried and failed.
 
 Every level reports which one it used, so the API and the UI can say
 plainly whether a number is current or carried over. Silently serving
@@ -89,14 +93,29 @@ class LiveFeatureStore:
         return (datetime.now(UTC) - self._fetched_at).total_seconds()
 
     def status(self) -> dict:
+        # A store that has never been asked for data is NOT a store that
+        # failed. /health only reads status(), it never calls refresh(),
+        # so on a cold process `_source` is still its initial "none" --
+        # and the dashboard rendered that as "Neither the upstream feed
+        # nor the local dataset is available", which is alarming and
+        # untrue. "warming" says what is actually happening: no fetch
+        # has been attempted yet. The first request for features turns
+        # it into live / stale_cache / historical, and only a real
+        # failure (recorded in _last_error) ever reports "none".
+        if self._features is None and self._last_error is None:
+            source = "warming"
+        else:
+            source = self._source
+
         return {
             "cached": self._features is not None,
             "fetched_at": self._fetched_at.isoformat() if self._fetched_at else None,
             "age_seconds": round(self.age_seconds, 1) if self.age_seconds else None,
             "stale": self.is_stale,
             # Which rung of the degradation ladder produced the data
-            # currently being served: live | stale_cache | historical.
-            "source": self._source,
+            # currently being served:
+            # warming | live | stale_cache | historical | none.
+            "source": source,
             "upstream_error": self._last_error,
             "cities": int(self._features.city_id.nunique())
             if self._features is not None
