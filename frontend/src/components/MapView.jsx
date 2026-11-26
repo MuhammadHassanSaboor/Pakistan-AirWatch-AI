@@ -3,6 +3,7 @@ import {
   CircleMarker,
   GeoJSON,
   MapContainer,
+  Marker,
   Pane,
   ScaleControl,
   TileLayer,
@@ -20,6 +21,7 @@ import {
   Tag,
 } from "lucide-react";
 import clsx from "clsx";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { BASEMAPS, DEFAULT_BASEMAP, getBasemap } from "../lib/basemaps";
@@ -31,7 +33,8 @@ import {
   textOn,
 } from "../lib/aqi";
 import { UNIT, fmtPopulation } from "../lib/format";
-import kashmir from "../data/kashmir.json";
+import pakistanBoundary from "../data/pakistan-boundary.json";
+import mapLabels from "../data/map-labels.json";
 
 const PK_CENTER = [30.3753, 69.3451];
 const PK_BOUNDS = [
@@ -108,31 +111,49 @@ function FitPakistan({ trigger }) {
 
 function BasemapSwitcher({ value, onChange }) {
   return (
-    <div className="flex rounded-lg border border-line bg-sunken p-0.5">
+    /* The active style used to be white-on-accent, which inverted with
+       the theme and left black text on a dark toolbar. The selected
+       item now stays in the accent colour on a tinted pill, so it reads
+       the same way in both themes: bolder, brighter, lifted -- never a
+       colour swap that depends on which theme is on. */
+    <div className="flex rounded-xl border border-line bg-sunken p-1">
       {BASEMAPS.map((b) => {
         const Icon = STYLE_ICONS[b.id] ?? MapIcon;
         const active = b.id === value;
         return (
-          <button
+          <motion.button
             key={b.id}
             type="button"
             onClick={() => onChange(b.id)}
             title={`${b.name} basemap`}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
             className={clsx(
-              "relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors",
-              active ? "text-canvas" : "text-fg-subtle hover:text-fg",
+              "relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors duration-200",
+              active
+                ? "font-bold text-accent"
+                : "font-medium text-fg-subtle hover:text-fg",
             )}
           >
             {active ? (
               <motion.span
                 layoutId="basemap-pill"
-                className="absolute inset-0 -z-10 rounded-lg bg-accent"
+                className="absolute inset-0 -z-10 rounded-lg border border-accent/40 bg-accent/15 shadow-glow"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}
               />
             ) : null}
-            <Icon size={12} />
+            <motion.span
+              animate={
+                active ? { rotate: [0, -12, 0], scale: [1, 1.18, 1] } : {}
+              }
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="flex"
+            >
+              <Icon size={13} />
+            </motion.span>
             <span className="hidden sm:inline">{b.name}</span>
-          </button>
+          </motion.button>
         );
       })}
     </div>
@@ -160,77 +181,83 @@ function MapLegend() {
   );
 }
 
-/* ── Kashmir ─────────────────────────────────────────────── */
+/* ── national outline ────────────────────────────────────── */
 
 /**
- * The Kashmir region, drawn the way the Government of Pakistan's
- * official map shows it.
+ * Pakistan, outlined the way the Government of Pakistan's official
+ * map shows it.
  *
- * Geometry is Natural Earth's 10m disputed-areas dataset (public
- * domain), extracted by scripts/build_kashmir_geojson.py. It is not
- * approximated by hand: a boundary drawn from memory is wrong in a way
- * no reviewer can check, and on this subject that is not a cosmetic
- * defect. Each feature keeps Natural Earth's own administration note,
- * so the tooltip states the status rather than our paraphrase of it.
+ * The geometry is Natural Earth's admin-0 polygon dissolved with Azad
+ * Jammu & Kashmir and Gilgit-Baltistan (scripts/build_pakistan_
+ * boundary.py). Dissolving matters: drawn as three separate polygons,
+ * the shared edges become black lines through the middle of the
+ * country, which is the one thing a national border must not do.
  *
- * Styling carries the distinction. Pakistan-administered territory
- * (Azad Jammu & Kashmir, Gilgit-Baltistan) is drawn in the accent as
- * part of the country. Indian-occupied Jammu & Kashmir is drawn as
- * disputed: a dashed outline with a hatched fill, the standard
- * cartographic treatment for territory under dispute.
+ * It is drawn as a cased line -- a soft light halo under a black core.
+ * A bare black stroke is invisible against a dark basemap or satellite
+ * imagery, and casing is how printed maps have always kept a dark
+ * boundary legible over dark ground. The border itself stays black in
+ * both themes.
  */
-const REGION_STYLES = {
-  pakistan: { stroke: "var(--c-accent)", dash: null, fill: 0.1, weight: 1.6 },
-  occupied: { stroke: "var(--c-warn)", dash: "7 5", fill: 0.14, weight: 1.8 },
-  disputed: {
-    stroke: "var(--c-fg-subtle)",
-    dash: "3 4",
-    fill: 0.1,
-    weight: 1.4,
-  },
-  china: { stroke: "var(--c-fg-faint)", dash: "2 5", fill: 0.07, weight: 1.2 },
-};
-
-function cssColor(variable) {
-  if (typeof document === "undefined") return "#888";
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(variable.replace("var(", "").replace(")", ""))
-    .trim();
-  return raw ? `rgb(${raw})` : "#888";
+function PakistanOutline() {
+  return (
+    <Pane name="pk-outline" style={{ zIndex: 440, pointerEvents: "none" }}>
+      <GeoJSON
+        data={pakistanBoundary}
+        interactive={false}
+        style={{
+          color: "#FFFFFF",
+          weight: 5,
+          opacity: 0.5,
+          fill: false,
+          lineJoin: "round",
+        }}
+      />
+      <GeoJSON
+        data={pakistanBoundary}
+        interactive={false}
+        style={{
+          color: "#000000",
+          weight: 2,
+          opacity: 0.95,
+          fill: false,
+          lineJoin: "round",
+        }}
+      />
+    </Pane>
+  );
 }
 
-function KashmirLayer({ themeKey }) {
-  const style = (feature) => {
-    const spec =
-      REGION_STYLES[feature.properties.role] ?? REGION_STYLES.disputed;
-    const colour = cssColor(spec.stroke);
-    return {
-      color: colour,
-      weight: spec.weight,
-      dashArray: spec.dash ?? undefined,
-      fillColor: colour,
-      fillOpacity: spec.fill,
-      interactive: true,
-    };
-  };
-
-  const onEachFeature = (feature, layer) => {
-    const { label, note } = feature.properties;
-    layer.bindTooltip(
-      `<span class="font-semibold">${label}</span>` +
-        (note ? `<br/><span class="opacity-70">${note}</span>` : ""),
-      { direction: "top", sticky: true, className: "airwatch-region-label" },
-    );
-  };
+/**
+ * Place names that are not drawn as territory -- a label only, with no
+ * outline and no fill.
+ *
+ * A divIcon rather than a permanent tooltip on an invisible marker: a
+ * divIcon is plain positioned HTML that renders regardless, while a
+ * tooltip depends on its host layer staying alive and interactive, and
+ * a zero-radius non-interactive CircleMarker is exactly the case where
+ * that quietly does nothing.
+ */
+function MapLabels() {
+  const icon = (text) =>
+    L.divIcon({
+      className: "airwatch-place-label",
+      html: `<span>${text}</span>`,
+      iconSize: [130, 34],
+      iconAnchor: [65, 17],
+    });
 
   return (
-    <Pane name="kashmir" style={{ zIndex: 450 }}>
-      <GeoJSON
-        key={`kashmir-${themeKey}`}
-        data={kashmir}
-        style={style}
-        onEachFeature={onEachFeature}
-      />
+    <Pane name="pk-labels" style={{ zIndex: 445, pointerEvents: "none" }}>
+      {mapLabels.map((entry) => (
+        <Marker
+          key={entry.label}
+          position={[entry.lat, entry.lon]}
+          icon={icon(entry.label)}
+          interactive={false}
+          keyboard={false}
+        />
+      ))}
     </Pane>
   );
 }
@@ -250,6 +277,10 @@ export default function MapView({
 }) {
   const [zoom, setZoom] = useState(5);
   const [hovered, setHovered] = useState(null);
+  // Separate from `hovered` on purpose: the inspector keeps showing the
+  // last city after the pointer leaves, so its numbers can be read
+  // instead of disappearing on the way to them.
+  const [inspectedId, setInspectedId] = useState(null);
   const [showValues, setShowValues] = useState(true);
 
   // A dark basemap under a light UI looks broken, so the map follows
@@ -303,6 +334,12 @@ export default function MapView({
         .map((p) => p.city_id),
     );
   }, [points, zoom, showValues]);
+
+  const inspected = useMemo(
+    () =>
+      points.find((p) => p.city_id === (selectedCity ?? inspectedId)) ?? null,
+    [points, selectedCity, inspectedId],
+  );
 
   return (
     /* The controls used to float ON the map. On a reload they appeared
@@ -381,7 +418,8 @@ export default function MapView({
             maxZoom={basemap.maxZoom ?? 16}
           />
 
-          <KashmirLayer themeKey={theme} />
+          <PakistanOutline />
+          <MapLabels />
 
           {showLabels && basemap.labels ? (
             <Pane
@@ -424,7 +462,10 @@ export default function MapView({
                 }}
                 eventHandlers={{
                   click: () => onSelectCity(p.city_id),
-                  mouseover: () => setHovered(p.city_id),
+                  mouseover: () => {
+                    setHovered(p.city_id);
+                    setInspectedId(p.city_id);
+                  },
                   mouseout: () => setHovered(null),
                 }}
               >
@@ -438,10 +479,6 @@ export default function MapView({
                     <span style={{ color }}>{Math.round(p.pm2_5_pred)}</span>
                   </Tooltip>
                 ) : null}
-
-                <Tooltip direction="top" offset={[0, -8]} opacity={1} sticky>
-                  <MarkerTooltip point={p} />
-                </Tooltip>
               </CircleMarker>
             );
           })}
@@ -480,73 +517,95 @@ export default function MapView({
           </div>
         ) : null}
       </div>
+
+      <CityInspector point={inspected} horizon={horizon} />
     </div>
   );
 }
 
-function MarkerTooltip({ point }) {
-  const band = bandForPm25(point.pm2_5_pred);
+/**
+ * City detail, below the map rather than floating on it.
+ *
+ * This replaced per-marker Leaflet tooltips. Those opened on mouseover
+ * and closed on mouseout, but when the forecast reloads the markers
+ * are rebuilt underneath a stationary cursor: the new marker fires its
+ * mouseover and the old one is destroyed before it can fire mouseout,
+ * so its tooltip is never closed. Reload the page with the pointer
+ * over Punjab and four or five cards are left stranded across the map,
+ * each needing a click to dismiss. No amount of z-index fixes that --
+ * the lifecycle is the bug.
+ *
+ * A single strip outside the map cannot strand anything, is always in
+ * the same place, and never covers the country. It keeps the last
+ * hovered city after the pointer leaves, so the numbers can actually
+ * be read instead of vanishing on the way to them.
+ */
+function CityInspector({ point, horizon }) {
+  const band = point ? bandForPm25(point.pm2_5_pred) : null;
+
   return (
-    <div className="min-w-[206px] p-1">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-fg">
-            {point.city_name ?? point.city_id}
-          </div>
-          <div className="text-[10px] text-fg-faint">{point.province}</div>
-        </div>
-        <span
-          className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold"
-          style={{ background: band?.color, color: textOn(band?.color) }}
-        >
-          AQI {point.aqi_us}
-        </span>
-      </div>
+    <div className="flex h-[58px] items-center gap-3 border-t border-line bg-surface px-3">
+      <AnimatePresence mode="wait">
+        {point ? (
+          <motion.div
+            key={point.city_id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18 }}
+            className="flex min-w-0 flex-1 items-center gap-3"
+          >
+            <span
+              className="h-8 w-1 shrink-0 rounded-full"
+              style={{ background: band?.color }}
+            />
 
-      <div className="mt-3 flex items-end gap-1.5">
-        <span className="metric text-[28px] text-fg">
-          {point.pm2_5_pred?.toFixed(1)}
-        </span>
-        <span className="pb-1 text-[10px] text-fg-faint">{UNIT}</span>
-      </div>
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-fg">
+                {point.city_name ?? point.city_id}
+              </div>
+              <div className="truncate text-2xs text-fg-subtle">
+                {point.province}
+              </div>
+            </div>
 
-      {/* Filled, with text picked for contrast: a 10% tint behind
-          band-coloured text is unreadable at both ends of the scale. */}
-      <div
-        className="mt-2 rounded-md px-2 py-1 text-center text-[11px] font-bold"
-        style={{ background: band?.color, color: textOn(band?.color) }}
-      >
-        {band?.name}
-      </div>
+            <div className="ml-1 flex items-baseline gap-1">
+              <span className="metric text-xl text-fg">
+                {point.pm2_5_pred?.toFixed(1)}
+              </span>
+              <span className="text-2xs text-fg-faint">{UNIT}</span>
+            </div>
 
-      <div
-        className="mt-2.5 space-y-1 border-t pt-2 text-[10px] text-fg-subtle"
-        style={{ borderColor: "var(--hairline)" }}
-      >
-        <Row label="Forecast" value={`+${point.horizon}h`} mono />
-        <Row label="Population" value={fmtPopulation(point.population)} mono />
-        <Row label="Source" value="AI forecast" accent />
-      </div>
+            <span
+              className="shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-2xs font-bold"
+              style={{ background: band?.color, color: textOn(band?.color) }}
+            >
+              {band?.abbr}
+            </span>
 
-      <div className="mt-2 text-center text-[9px] text-fg-faint">
-        click for full history
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, mono, accent }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span>{label}</span>
-      <span
-        className={clsx(
-          mono && "font-mono",
-          accent ? "font-medium text-accent" : "text-fg-muted",
+            <div className="ml-auto hidden items-center gap-4 text-2xs text-fg-subtle sm:flex">
+              <span className="font-mono">AQI {point.aqi_us}</span>
+              <span className="font-mono">+{horizon}h</span>
+              <span className="hidden md:inline">
+                {fmtPopulation(point.population)}
+              </span>
+              <span className="hidden font-medium text-accent lg:inline">
+                AI forecast
+              </span>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.span
+            key="idle"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-xs text-fg-subtle"
+          >
+            Hover a city for its forecast, or click to open its history.
+          </motion.span>
         )}
-      >
-        {value}
-      </span>
+      </AnimatePresence>
     </div>
   );
 }
