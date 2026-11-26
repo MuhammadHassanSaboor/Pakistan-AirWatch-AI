@@ -9,6 +9,8 @@ import DataSourceBanner from "./components/DataSourceBanner";
 import { CitySearch, HorizonSelector, Legend } from "./components/Controls";
 import {
   DistributionChart,
+  ElevationScatter,
+  PopulationScatter,
   ProvinceChart,
   TopCitiesChart,
 } from "./components/charts";
@@ -272,7 +274,7 @@ python -m src.serving.app`}
 
           <Card
             title="Distribution"
-            subtitle={`${features.length} cities by AQI category`}
+            subtitle={`${features.length} cities by EPA category`}
             delay={0.15}
           >
             {forecast.loading ? (
@@ -281,6 +283,43 @@ python -m src.serving.app`}
               <DistributionChart
                 features={features}
                 height={330}
+                theme={theme}
+              />
+            )}
+          </Card>
+        </div>
+
+        {/* ── relationships: what the bar charts cannot show ── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card
+            title="Does city size drive pollution?"
+            subtitle="Population versus forecast PM2.5 · log scale · click a point"
+            delay={0.2}
+          >
+            {forecast.loading ? (
+              <Skeleton className="m-2 h-72" />
+            ) : (
+              <PopulationScatter
+                features={features}
+                height={330}
+                onSelect={setSelectedCity}
+                theme={theme}
+              />
+            )}
+          </Card>
+
+          <Card
+            title="Altitude and air quality"
+            subtitle="Highland cities sit in thinner, better-ventilated air"
+            delay={0.25}
+          >
+            {forecast.loading ? (
+              <Skeleton className="m-2 h-72" />
+            ) : (
+              <ElevationScatter
+                features={features}
+                height={330}
+                onSelect={setSelectedCity}
                 theme={theme}
               />
             )}

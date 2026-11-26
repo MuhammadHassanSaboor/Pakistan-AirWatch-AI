@@ -6,14 +6,85 @@
  * this table is the offline fallback so the map still renders if the
  * API is unreachable.
  */
+/**
+ * The six official categories, in severity order.
+ *
+ * `name` is the EPA's exact wording and must not be paraphrased — a
+ * category that reads "Sensitive" is not a standard anyone can look
+ * up. `abbr` is the published short form (USG is the EPA's own) for
+ * places too narrow to hold the full name, such as an axis tick.
+ *
+ * ORDER MATTERS. These are always presented Good → Hazardous. Sorting
+ * them by city count produces a sequence like "Unhealthy, Moderate,
+ * USG, Very Unhealthy, Good" which looks like a bug to anyone who
+ * knows the scale.
+ *
+ * Colours are the EPA's published swatches, darkened slightly where
+ * the official value (notably #00E400 and #FFFF00) fails contrast on
+ * a light background.
+ */
 export const AQI_BANDS = [
-  { name: "Good", lower: 0, upper: 50, pm: 9.0, color: "#00E400", text: "#052E05" },
-  { name: "Moderate", lower: 51, upper: 100, pm: 35.4, color: "#FFD400", text: "#2E2700" },
-  { name: "Unhealthy for Sensitive Groups", short: "Sensitive", lower: 101, upper: 150, pm: 55.4, color: "#FF7E00", text: "#2E1700" },
-  { name: "Unhealthy", lower: 151, upper: 200, pm: 125.4, color: "#FF3B30", text: "#FFF" },
-  { name: "Very Unhealthy", short: "Very Unhealthy", lower: 201, upper: 300, pm: 225.4, color: "#8F3F97", text: "#FFF" },
-  { name: "Hazardous", lower: 301, upper: 500, pm: Infinity, color: "#7E0023", text: "#FFF" },
+  {
+    name: "Good",
+    abbr: "Good",
+    lower: 0,
+    upper: 50,
+    pm: 9.0,
+    color: "#00B050",
+    advice: "Air quality is satisfactory and poses little or no risk.",
+  },
+  {
+    name: "Moderate",
+    abbr: "Moderate",
+    lower: 51,
+    upper: 100,
+    pm: 35.4,
+    color: "#E8B600",
+    advice:
+      "Unusually sensitive people should consider limiting prolonged outdoor exertion.",
+  },
+  {
+    name: "Unhealthy for Sensitive Groups",
+    abbr: "USG",
+    lower: 101,
+    upper: 150,
+    pm: 55.4,
+    color: "#FF7E00",
+    advice:
+      "Children, older adults and people with heart or lung disease should reduce prolonged outdoor exertion.",
+  },
+  {
+    name: "Unhealthy",
+    abbr: "Unhealthy",
+    lower: 151,
+    upper: 200,
+    pm: 125.4,
+    color: "#F03B36",
+    advice: "Everyone may begin to experience health effects.",
+  },
+  {
+    name: "Very Unhealthy",
+    abbr: "Very Unhealthy",
+    lower: 201,
+    upper: 300,
+    pm: 225.4,
+    color: "#8F3F97",
+    advice:
+      "Health alert: everyone may experience more serious health effects.",
+  },
+  {
+    name: "Hazardous",
+    abbr: "Hazardous",
+    lower: 301,
+    upper: 500,
+    pm: Infinity,
+    color: "#7E0023",
+    advice: "Health warning of emergency conditions.",
+  },
 ];
+
+/** Highest AQI the scale defines — used to position gauges. */
+export const AQI_MAX = 500;
 
 const BREAKPOINTS = [
   [0.0, 9.0, 0, 50],
@@ -36,10 +107,17 @@ export function pm25ToAqi(value) {
   return 500;
 }
 
+/** The band an AQI VALUE falls in. */
+export function aqiCategory(aqi) {
+  if (aqi == null || Number.isNaN(aqi)) return null;
+  return (
+    AQI_BANDS.find((b) => aqi >= b.lower && aqi <= b.upper) ?? AQI_BANDS.at(-1)
+  );
+}
+
+/** The band a PM2.5 CONCENTRATION falls in. */
 export function bandForPm25(value) {
-  const aqi = pm25ToAqi(value);
-  if (aqi == null) return null;
-  return AQI_BANDS.find((b) => aqi >= b.lower && aqi <= b.upper) ?? AQI_BANDS.at(-1);
+  return aqiCategory(pm25ToAqi(value));
 }
 
 export function colorForPm25(value) {
