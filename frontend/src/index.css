@@ -34,7 +34,7 @@
     --c-fg: 250 250 252; /* 18:1 */
     --c-fg-muted: 178 178 190; /* 9.1:1 */
     --c-fg-subtle: 132 132 146; /* 5.2:1 */
-    --c-fg-faint: 97 97 110;
+    --c-fg-faint: 124 124 138; /* 5.3:1 */
 
     /* Cobalt. Deeper and less toy-like than sky blue, and the hue sits
        between the AQI green and the AQI violet without touching
@@ -100,7 +100,7 @@
     --c-fg: 15 15 20; /* 17:1 on white */
     --c-fg-muted: 78 78 90; /* 7.4:1 */
     --c-fg-subtle: 110 110 124; /* 4.9:1 */
-    --c-fg-faint: 146 146 160;
+    --c-fg-faint: 112 112 126; /* 4.7:1 */
 
     /* The light theme needs a far darker accent for the same job: the
        dark theme's cobalt is only 2.4:1 on white. */
@@ -289,11 +289,14 @@
   }
 
   .card-title {
-    @apply text-[13px] font-semibold tracking-tight text-fg;
+    @apply text-[14px] font-semibold tracking-tight text-fg;
   }
 
   .eyebrow {
-    @apply text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-faint;
+    /* 10px caps with wide tracking is a label nobody reads. 11px at
+       a stronger tier is still clearly subordinate and actually
+       legible. */
+    @apply text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-subtle;
   }
 
   /* Floating control surfaces that sit over the map. These DO use
@@ -305,8 +308,8 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-lg border px-2 py-1
-           text-[11px] font-medium text-fg-muted;
+    @apply inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1
+           text-xs font-medium text-fg-muted;
     border-color: var(--hairline);
     background-color: rgb(var(--c-raised) / 0.8);
   }

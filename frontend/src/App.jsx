@@ -38,9 +38,7 @@ function Card({ title, subtitle, action, children, delay = 0, className }) {
         <div className="min-w-0">
           <h2 className="card-title truncate">{title}</h2>
           {subtitle ? (
-            <p className="mt-0.5 truncate text-[11px] text-fg-faint">
-              {subtitle}
-            </p>
+            <p className="mt-0.5 truncate text-xs text-fg-subtle">{subtitle}</p>
           ) : null}
         </div>
         {action}
@@ -246,7 +244,7 @@ python -m src.serving.app`}
                   />
                 </div>
                 {selectedCityName ? (
-                  <p className="mt-2 text-[11px] text-fg-subtle">
+                  <p className="mt-2 text-xs text-fg-muted">
                     Showing{" "}
                     <span className="font-medium text-accent">
                       {selectedCityName}

@@ -32,7 +32,7 @@ function arcPath(cx, cy, r, startDeg, endDeg) {
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
 }
 
-export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
+export default function AqiGauge({ aqi, size = 184, stroke = 14 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -43,11 +43,14 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
   const cy = size / 2;
   const r = (size - stroke) / 2 - 2;
 
-  // Each band occupies a slice proportional to its AQI width.
+  // Each band occupies a slice proportional to its AQI width. A small
+  // gap between slices keeps adjacent colours from blending into one
+  // smear, which is what made the scale hard to count.
+  const GAP = 1.4;
   const segments = AQI_BANDS.map((b) => {
     const from = START_ANGLE + (b.lower / AQI_MAX) * SWEEP;
     const to = START_ANGLE + ((b.upper + 1) / AQI_MAX) * SWEEP;
-    return { band: b, from, to };
+    return { band: b, from: from + GAP / 2, to: to - GAP / 2 };
   });
 
   const needleAngle = START_ANGLE + (value / AQI_MAX) * SWEEP;
@@ -63,17 +66,25 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
         role="img"
         aria-label={`Air quality index ${Math.round(value)}, ${band?.name}`}
       >
-        {/* track */}
+        {/* Track. Drawn in a line colour rather than the sunken surface
+            so the dial has a visible body on a photograph, where the
+            card's own background is not behind it. */}
         <path
           d={arcPath(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP)}
           fill="none"
-          stroke="rgb(var(--c-sunken))"
+          stroke="rgb(var(--c-line-strong) / 0.5)"
           strokeWidth={stroke}
           strokeLinecap="round"
         />
 
-        {/* band segments — dim until the needle reaches them, so the
-            dial reads as "how far along the scale are we" */}
+        {/* Band segments.
+            Progress used to be shown by fading unreached bands to 22%
+            opacity, which fails in opposite ways per theme: on dark
+            they sink into the background, on light they look like a
+            printing error. Thickness carries it instead -- unreached
+            bands are drawn thin, reached bands full width -- so every
+            colour stays fully saturated and fully visible in both
+            themes, and the dial still reads as "how far along are we". */}
         {segments.map(({ band: b, from, to }) => {
           const reached = value >= b.lower;
           return (
@@ -82,16 +93,33 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
               d={arcPath(cx, cy, r, from, to)}
               fill="none"
               stroke={b.color}
-              strokeWidth={stroke}
               strokeLinecap="butt"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: reached ? 0.95 : 0.22 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              initial={{ opacity: 0, strokeWidth: stroke * 0.45 }}
+              animate={{
+                opacity: 1,
+                strokeWidth: reached ? stroke : stroke * 0.45,
+              }}
+              transition={{ duration: 0.6, delay: 0.1 + b.lower / 1200 }}
             />
           );
         })}
 
-        {/* needle */}
+        {/* Needle, with a halo behind it. The needle always lands ON a
+            band colour, and a bare foreground-coloured line is lost
+            against Hazardous maroon in dark or Moderate yellow in
+            light; the halo guarantees it separates from both. */}
+        <motion.line
+          x1={needleInner.x}
+          y1={needleInner.y}
+          x2={needleOuter.x}
+          y2={needleOuter.y}
+          stroke="rgb(var(--c-surface))"
+          strokeWidth={6.5}
+          strokeLinecap="round"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: mounted ? 0.95 : 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+        />
         <motion.line
           x1={needleInner.x}
           y1={needleInner.y}
@@ -110,7 +138,8 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
             delay: 0.3,
           }}
         />
-        <circle cx={cx} cy={cy} r={4} fill="rgb(var(--c-fg))" />
+        <circle cx={cx} cy={cy} r={6} fill="rgb(var(--c-surface))" />
+        <circle cx={cx} cy={cy} r={3.5} fill="rgb(var(--c-fg))" />
       </svg>
 
       {/* centred readout */}
@@ -130,8 +159,8 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
           {Math.round(value)}
         </motion.span>
         <span
-          className="mt-1.5 max-w-[8rem] rounded-md px-1.5 py-0.5 text-center
-                     text-[11px] font-bold leading-tight"
+          className="mt-2 max-w-[8.5rem] rounded-lg px-2 py-1 text-center
+                     text-xs font-bold leading-tight shadow-sm"
           style={{ background: band?.color, color: textOn(band?.color) }}
         >
           {band?.abbr === "USG" ? "Sensitive groups" : band?.name}

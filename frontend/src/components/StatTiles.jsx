@@ -297,9 +297,17 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
       </div>
 
       <div className="plate relative mt-3 p-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-2xl font-semibold tracking-tight text-fg">
+        {/* One band chip, not two.
+            The previous row put the value, its unit AND a band chip on
+            a single line with `ml-auto`. At "Faisalabad / 279.4 /
+            Hazardous" that line cannot fit a half-width card, so the
+            chip was clipped by the card's overflow. The band chip now
+            owns the top-right corner -- it is `shrink-0` with the name
+            allowed to truncate beside it -- and the AQI number, which
+            is always short, sits inline with the value instead. */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xl font-semibold tracking-tight text-fg">
               {city?.city_name ?? "—"}
             </div>
             <div className="truncate text-xs font-medium text-fg-muted">
@@ -307,28 +315,25 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
             </div>
           </div>
           <motion.span
-            className="shrink-0 rounded-lg px-2.5 py-1 font-mono text-[13px] font-bold shadow-sm"
+            className="shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs
+                       font-bold shadow-sm"
             style={{ background: band?.color, color: textOn(band?.color) }}
             animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            AQI {city?.aqi_us ?? "—"}
+            {band?.abbr}
           </motion.span>
         </div>
 
-        <div className="mt-2 flex items-end gap-1.5">
+        <div className="mt-2 flex flex-wrap items-end gap-x-1.5 gap-y-1">
           {/* The numeral is foreground, not band colour: at Moderate the
-              band colour is 1.89:1 on white. The band is carried by the
-              filled chip beside it, which is readable at every step. */}
+              band colour is 1.89:1 on white. */}
           <span className="metric text-[2.25rem] leading-none text-fg">
             {city?.pm2_5?.toFixed(1) ?? "—"}
           </span>
           <span className="pb-1 text-xs font-medium text-fg-muted">{UNIT}</span>
-          <span
-            className="mb-1 ml-auto shrink-0 rounded-md px-2 py-0.5 text-[13px] font-bold"
-            style={{ background: band?.color, color: textOn(band?.color) }}
-          >
-            {band?.abbr}
+          <span className="ml-auto shrink-0 pb-1 font-mono text-[13px] font-bold text-fg-muted">
+            AQI {city?.aqi_us ?? "—"}
           </span>
         </div>
 
