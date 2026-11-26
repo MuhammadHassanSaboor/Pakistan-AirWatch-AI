@@ -52,7 +52,7 @@ async function request(path, options = {}) {
     }
     if (err instanceof ApiError) throw err;
     throw new ApiError(
-      "Cannot reach the API. Is the Flask server running on port 5000?",
+      "Cannot reach the API. Is the Flask server running? Check API_PORT in .env.",
       0,
       null,
     );

@@ -20,21 +20,25 @@
 @layer base {
   :root,
   [data-theme="dark"] {
-    --c-canvas: 8 9 13; /* #08090D */
-    --c-surface: 16 18 24; /* #101218 */
-    --c-raised: 23 26 34; /* #171A22 */
-    --c-sunken: 11 13 18;
-    --c-line: 31 35 45; /* hairline */
-    --c-line-strong: 52 58 72;
+    --c-canvas: 7 10 18; /* #070A12 */
+    --c-surface: 14 19 31; /* #0E131F */
+    --c-raised: 21 28 43; /* #151C2B */
+    --c-sunken: 10 14 24;
+    --c-line: 29 38 56; /* hairline */
+    --c-line-strong: 50 64 90;
 
     --c-fg: 248 250 252; /* 17:1 */
     --c-fg-muted: 165 174 190; /* 8.2:1 */
     --c-fg-subtle: 123 133 151; /* 4.9:1 */
     --c-fg-faint: 88 97 113;
 
-    --c-accent: 45 212 191;
-    --c-accent-soft: 94 234 212;
-    --c-accent-strong: 20 184 166;
+    /* Azure, not teal. An air-quality app should read as sky, and
+       azure also stays clear of every AQI swatch (green, amber,
+       orange, red, violet, maroon) so the accent is never mistaken
+       for a severity colour. */
+    --c-accent: 56 189 248;
+    --c-accent-soft: 125 211 252;
+    --c-accent-strong: 14 165 233;
 
     --c-ok: 52 211 153;
     --c-warn: 251 191 36;
@@ -52,8 +56,8 @@
 
     --hairline: rgb(255 255 255 / 0.06);
     --sheen: rgb(255 255 255 / 0.04);
-    --glow-a: rgba(45, 212, 191, 0.08);
-    --glow-b: rgba(59, 130, 246, 0.06);
+    --glow-a: rgba(56, 189, 248, 0.09);
+    --glow-b: rgba(129, 140, 248, 0.07);
 
     color-scheme: dark;
   }
@@ -71,9 +75,9 @@
     --c-fg-subtle: 110 120 138; /* 4.6:1 */
     --c-fg-faint: 148 158 175;
 
-    --c-accent: 13 148 136;
-    --c-accent-soft: 15 118 110;
-    --c-accent-strong: 17 94 89;
+    --c-accent: 2 132 199;
+    --c-accent-soft: 3 105 161;
+    --c-accent-strong: 7 89 133;
 
     --c-ok: 16 145 93;
     --c-warn: 180 124 10;
@@ -89,8 +93,8 @@
 
     --hairline: rgb(16 24 40 / 0.07);
     --sheen: rgb(255 255 255 / 0.7);
-    --glow-a: rgba(13, 148, 136, 0.06);
-    --glow-b: rgba(59, 130, 246, 0.05);
+    --glow-a: rgba(2, 132, 199, 0.07);
+    --glow-b: rgba(99, 102, 241, 0.05);
 
     color-scheme: light;
   }
@@ -112,6 +116,35 @@
       color 0.3s ease;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /* A slowly breathing aurora behind everything. Two large blobs on
+     long, prime-ish durations never line up, so the motion reads as
+     weather rather than as a loop. Fixed and behind the content, so it
+     costs one composited layer and nothing else. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(42% 38% at 22% 18%, var(--glow-a), transparent 62%),
+      radial-gradient(38% 34% at 78% 8%, var(--glow-b), transparent 64%),
+      radial-gradient(46% 40% at 60% 96%, var(--glow-a), transparent 66%);
+    animation: aurora 38s ease-in-out infinite alternate;
+  }
+
+  @keyframes aurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(2.5%, -2%, 0) scale(1.08);
+    }
+    100% {
+      transform: translate3d(-2%, 2.5%, 0) scale(1.03);
+    }
   }
 
   .tnum,
@@ -172,11 +205,20 @@
   }
 
   .card-hover {
-    @apply transition-all duration-200;
+    transition:
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.28s ease,
+      border-color 0.28s ease;
   }
   .card-hover:hover {
-    @apply -translate-y-0.5 shadow-float;
-    border-color: rgb(var(--c-line-strong) / 0.6);
+    transform: translateY(-3px);
+    border-color: rgb(var(--c-accent) / 0.3);
+    /* The accent hairline is what makes the lift feel like focus and
+       not just a drop shadow. */
+    box-shadow:
+      var(--shadow-float),
+      0 0 0 1px rgb(var(--c-accent) / 0.16),
+      0 0 32px -14px rgb(var(--c-accent) / 0.4);
   }
 
   .card-head {
@@ -338,6 +380,27 @@
 }
 .js-plotly-plot .modebar-btn:hover path {
   fill: rgb(var(--c-accent)) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Theme view transition
+
+   Kill the browser's default cross-fade so our clip-path circle is
+   the only thing animating. The new frame sits above the old one and
+   is revealed by the growing circle, which is what makes the sweep
+   look like liquid rather than a dissolve.
+   ═══════════════════════════════════════════════════════════ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 9999;
 }
 
 @media (prefers-reduced-motion: reduce) {

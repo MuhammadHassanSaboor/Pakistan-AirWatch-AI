@@ -53,7 +53,7 @@ export default function App() {
   const [horizon, setHorizon] = useState(24);
   const [selectedCity, setSelectedCity] = useState(null);
   const [resetSignal, setResetSignal] = useState(0);
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { theme, toggle: toggleTheme, isDark } = useTheme();
 
   const health = useApi(() => api.health(), []);
   const modelInfo = useApi(() => api.modelInfo(), []);
@@ -143,7 +143,7 @@ python -m src.serving.app`}
       <main className="mx-auto w-full max-w-[1680px] flex-1 space-y-4 px-4 py-5 sm:px-6 lg:py-6">
         <DataSourceBanner health={health.data} />
 
-        <StatTiles stats={stats.data} loading={stats.loading} />
+        <StatTiles stats={stats.data} loading={stats.loading} isDark={isDark} />
 
         {/* ── map: the hero ── */}
         <motion.section

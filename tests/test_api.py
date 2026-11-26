@@ -267,3 +267,56 @@ def test_every_response_is_json(api_client):
     ):
         r = api_client.get(path)
         assert r.content_type.startswith("application/json"), path
+
+
+def test_stats_returns_national_summary(api_client):
+    r = api_client.get("/api/stats")
+    assert r.status_code == 200
+    body = r.get_json()
+    for key in (
+        "cities_reporting",
+        "national_mean_pm25",
+        "national_median_pm25",
+        "worst",
+        "best",
+        "category_counts",
+        "observed_at",
+    ):
+        assert key in body, key
+    assert body["cities_reporting"] >= 1
+
+
+def test_stats_extremes_carry_city_context(api_client):
+    """The KPI cards show population and altitude beside the value, so
+    the endpoint must supply them rather than the frontend guessing."""
+    body = api_client.get("/api/stats").get_json()
+    for side in ("worst", "best"):
+        entry = body[side]
+        assert entry["city_id"]
+        assert entry["city_name"]
+        assert entry["province"]
+        assert isinstance(entry["pm2_5"], int | float)
+        assert isinstance(entry["aqi_us"], int)
+        assert entry["aqi_category"]
+        # Every city in the reference table has both, so a missing key
+        # means the join silently dropped them.
+        assert isinstance(entry["population"], int)
+        assert isinstance(entry["elevation_m"], int)
+
+
+def test_stats_worst_is_not_cleaner_than_best(api_client):
+    body = api_client.get("/api/stats").get_json()
+    assert body["worst"]["pm2_5"] >= body["best"]["pm2_5"]
+
+
+def test_stats_category_counts_use_official_band_names(api_client):
+    from src.serving import aqi as aqi_mod
+
+    official = {band.name for band in aqi_mod.CATEGORIES}
+    counts = api_client.get("/api/stats").get_json()["category_counts"]
+    assert counts
+    assert set(counts) <= official
+    assert (
+        sum(counts.values())
+        == api_client.get("/api/stats").get_json()["cities_reporting"]
+    )

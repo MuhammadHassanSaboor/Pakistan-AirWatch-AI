@@ -39,7 +39,9 @@ export function PanelHead({ title, icon: Icon, children }) {
         {Icon ? <Icon size={14} className="text-accent" /> : null}
         <h2 className="card-title">{title}</h2>
       </div>
-      {children ? <div className="flex items-center gap-2">{children}</div> : null}
+      {children ? (
+        <div className="flex items-center gap-2">{children}</div>
+      ) : null}
     </header>
   );
 }
@@ -106,8 +108,15 @@ export function ErrorState({ error, onRetry, compact = false }) {
         compact ? "p-6" : "p-10",
       )}
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-400">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-danger/12 text-danger">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 8v4M12 16h.01" />
         </svg>
@@ -143,8 +152,8 @@ export function EmptyState({ title, hint, icon: Icon }) {
 
 const TONES = {
   accent: "border-accent/35 bg-accent/12 text-accent",
-  blue: "border-sky-400/35 bg-sky-400/12 text-sky-300",
-  green: "border-emerald-400/35 bg-emerald-400/12 text-emerald-300",
+  blue: "border-accent/35 bg-accent/12 text-accent",
+  green: "border-ok/35 bg-ok/12 text-ok",
   slate: "border-line bg-raised text-fg-muted",
 };
 

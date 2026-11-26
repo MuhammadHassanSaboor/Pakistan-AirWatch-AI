@@ -11,6 +11,7 @@ import {
 
 import { EASE, ErrorState, Skeleton, SourceBadge } from "./primitives";
 import { TrendChart } from "./charts";
+import AqiScene from "./AqiScene";
 import { bandForPm25, pm25ToAqi } from "../lib/aqi";
 import {
   UNIT,
@@ -29,7 +30,9 @@ function Metric({ icon: Icon, label, value, unit }) {
       </div>
       <div className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
         {value}
-        {unit ? <span className="ml-1 text-2xs text-fg-faint">{unit}</span> : null}
+        {unit ? (
+          <span className="ml-1 text-2xs text-fg-faint">{unit}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -152,13 +155,20 @@ function Content({ data, loading, error, onClose, onRetry, theme }) {
                   {band?.name ?? "Unknown"}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-2xs uppercase tracking-wider text-fg-faint">
-                  AQI
+              <div className="flex items-center gap-2.5">
+                <div className="text-right">
+                  <div className="text-2xs uppercase tracking-wider text-fg-faint">
+                    AQI
+                  </div>
+                  <div className="font-mono text-xl font-bold text-fg">
+                    {pm25ToAqi(latest.pm2_5) ?? "—"}
+                  </div>
                 </div>
-                <div className="font-mono text-xl font-bold text-fg">
-                  {pm25ToAqi(latest.pm2_5) ?? "—"}
-                </div>
+                <AqiScene
+                  aqi={pm25ToAqi(latest.pm2_5)}
+                  size={52}
+                  isDark={theme !== "light"}
+                />
               </div>
             </div>
             <div className="mt-2.5 border-t border-line pt-2 text-2xs text-fg-faint">
@@ -242,9 +252,10 @@ function Content({ data, loading, error, onClose, onRetry, theme }) {
             theme={theme}
           />
           <p className="mt-1 text-2xs leading-relaxed text-fg-faint">
-            Grey is the reanalysis estimate, dotted blue is the provider&rsquo;s own
-            forecast, teal is our model. They are shown separately on purpose
-            &mdash; our prediction is not the same thing as a measurement.
+            Grey is the reanalysis estimate, dotted blue is the provider&rsquo;s
+            own forecast, teal is our model. They are shown separately on
+            purpose &mdash; our prediction is not the same thing as a
+            measurement.
           </p>
         </section>
 
@@ -266,7 +277,8 @@ function Content({ data, loading, error, onClose, onRetry, theme }) {
               Coordinates
             </div>
             <div className="mt-1 font-mono text-xs text-fg">
-              {fmtNumber(city.latitude, 4)}&deg;N, {fmtNumber(city.longitude, 4)}&deg;E
+              {fmtNumber(city.latitude, 4)}&deg;N,{" "}
+              {fmtNumber(city.longitude, 4)}&deg;E
             </div>
           </div>
         </section>
@@ -282,9 +294,7 @@ function Head({ title, subtitle, onClose }) {
         <h2 className="truncate text-sm font-bold tracking-tight text-fg">
           {title}
         </h2>
-        {subtitle ? (
-          <p className="text-xs text-fg-faint">{subtitle}</p>
-        ) : null}
+        {subtitle ? <p className="text-xs text-fg-faint">{subtitle}</p> : null}
       </div>
       <button
         type="button"
