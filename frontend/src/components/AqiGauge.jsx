@@ -115,7 +115,7 @@ export default function AqiGauge({ aqi, size = 184, stroke = 14 }) {
           y2={needleOuter.y}
           stroke="rgb(var(--c-surface))"
           strokeWidth={6.5}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           initial={{ opacity: 0 }}
           animate={{ opacity: mounted ? 0.95 : 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
@@ -127,7 +127,7 @@ export default function AqiGauge({ aqi, size = 184, stroke = 14 }) {
           y2={needleOuter.y}
           stroke="rgb(var(--c-fg))"
           strokeWidth={3}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           initial={{ opacity: 0, scale: 0.6 }}
           animate={{ opacity: mounted ? 1 : 0, scale: 1 }}
           style={{ transformOrigin: `${cx}px ${cy}px` }}

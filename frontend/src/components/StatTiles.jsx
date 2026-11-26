@@ -73,14 +73,12 @@ export default function StatTiles({
 
         {/* The band tint breathes, so the largest card on the page is
             never completely still. */}
-        <motion.div
+        <div
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="soft-pulse pointer-events-none absolute inset-0"
           style={{
             background: `radial-gradient(120% 120% at 100% 0%, ${national?.color} 0%, transparent 62%)`,
           }}
-          animate={{ opacity: [0.08, 0.16, 0.08] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
         />
 
         <div className="relative flex flex-1 flex-col p-5 sm:p-6">
@@ -118,7 +116,10 @@ export default function StatTiles({
               other the value, and neither is the footnote. */}
           <div className="mt-5 flex flex-1 items-center gap-5 sm:gap-7">
             <motion.div
-              className="plate shrink-0 !rounded-full p-1"
+              // No border on this one: a bordered round plate draws a
+              // second circle just outside the dial, and two concentric
+              // rings around one number reads as a mistake.
+              className="plate shrink-0 !rounded-full !border-0 p-1"
               initial={{ scale: 0.84, opacity: 0, rotate: -8 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 130, damping: 16 }}
@@ -322,14 +323,12 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
         </div>
 
         <div className="mt-2 flex items-center gap-2">
-          <motion.span
-            className="min-w-0 truncate rounded-lg px-2 py-1 text-xs font-bold shadow-sm"
+          <span
+            className="chip-beat min-w-0 truncate rounded-lg px-2 py-1 text-xs font-bold shadow-sm"
             style={{ background: band?.color, color: textOn(band?.color) }}
-            animate={{ scale: [1, 1.04, 1] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
           >
             {band?.abbr}
-          </motion.span>
+          </span>
           <span className="ml-auto shrink-0 font-mono text-[13px] font-bold text-fg-muted">
             AQI {city?.aqi_us ?? "—"}
           </span>

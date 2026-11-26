@@ -1,5 +1,3 @@
-import { motion } from "framer-motion";
-
 /**
  * The flag of Pakistan, drawn to its official specification.
  *
@@ -29,18 +27,16 @@ export default function PakistanFlag({
   const uid = `pk-flag-${width}`;
 
   return (
-    <motion.svg
+    <svg
       width={width}
       height={height}
       viewBox="0 0 900 600"
       role="img"
       aria-label="Flag of Pakistan"
-      className={`shrink-0 overflow-hidden rounded-[3px] ${className}`}
+      className={`shrink-0 overflow-hidden rounded-[3px] ${
+        wave ? "flag-wave" : ""
+      } ${className}`}
       style={{ boxShadow: "0 1px 3px rgb(0 0 0 / 0.35)" }}
-      animate={wave ? { rotate: [0, -1.6, 0, 1.6, 0] } : undefined}
-      transition={
-        wave ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : undefined
-      }
     >
       <defs>
         {/* The crescent: a disc with an offset disc removed. */}
@@ -63,6 +59,6 @@ export default function PakistanFlag({
           <path d="M0 -32 L9.4 -9.9 L33 -6.9 L15.4 9.3 L20.2 32 L0 20.4 L-20.2 32 L-15.4 9.3 L-33 -6.9 L-9.4 -9.9 Z" />
         </g>
       </g>
-    </motion.svg>
+    </svg>
   );
 }

@@ -25,14 +25,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { BASEMAPS, DEFAULT_BASEMAP, getBasemap } from "../lib/basemaps";
-import {
-  AQI_BANDS,
-  bandForPm25,
-  colorForPm25,
-  radiusForCity,
-  textOn,
-} from "../lib/aqi";
-import { UNIT, fmtPopulation } from "../lib/format";
+import { AQI_BANDS, colorForPm25, radiusForCity } from "../lib/aqi";
+import CityTicker from "./CityTicker";
 import pakistanBoundary from "../data/pakistan-boundary.json";
 import mapLabels from "../data/map-labels.json";
 
@@ -277,10 +271,6 @@ export default function MapView({
 }) {
   const [zoom, setZoom] = useState(5);
   const [hovered, setHovered] = useState(null);
-  // Separate from `hovered` on purpose: the inspector keeps showing the
-  // last city after the pointer leaves, so its numbers can be read
-  // instead of disappearing on the way to them.
-  const [inspectedId, setInspectedId] = useState(null);
   const [showValues, setShowValues] = useState(true);
 
   // A dark basemap under a light UI looks broken, so the map follows
@@ -334,12 +324,6 @@ export default function MapView({
         .map((p) => p.city_id),
     );
   }, [points, zoom, showValues]);
-
-  const inspected = useMemo(
-    () =>
-      points.find((p) => p.city_id === (selectedCity ?? inspectedId)) ?? null,
-    [points, selectedCity, inspectedId],
-  );
 
   return (
     /* The controls used to float ON the map. On a reload they appeared
@@ -462,10 +446,7 @@ export default function MapView({
                 }}
                 eventHandlers={{
                   click: () => onSelectCity(p.city_id),
-                  mouseover: () => {
-                    setHovered(p.city_id);
-                    setInspectedId(p.city_id);
-                  },
+                  mouseover: () => setHovered(p.city_id),
                   mouseout: () => setHovered(null),
                 }}
               >
@@ -518,94 +499,12 @@ export default function MapView({
         ) : null}
       </div>
 
-      <CityInspector point={inspected} horizon={horizon} />
-    </div>
-  );
-}
-
-/**
- * City detail, below the map rather than floating on it.
- *
- * This replaced per-marker Leaflet tooltips. Those opened on mouseover
- * and closed on mouseout, but when the forecast reloads the markers
- * are rebuilt underneath a stationary cursor: the new marker fires its
- * mouseover and the old one is destroyed before it can fire mouseout,
- * so its tooltip is never closed. Reload the page with the pointer
- * over Punjab and four or five cards are left stranded across the map,
- * each needing a click to dismiss. No amount of z-index fixes that --
- * the lifecycle is the bug.
- *
- * A single strip outside the map cannot strand anything, is always in
- * the same place, and never covers the country. It keeps the last
- * hovered city after the pointer leaves, so the numbers can actually
- * be read instead of vanishing on the way to them.
- */
-function CityInspector({ point, horizon }) {
-  const band = point ? bandForPm25(point.pm2_5_pred) : null;
-
-  return (
-    <div className="flex h-[58px] items-center gap-3 border-t border-line bg-surface px-3">
-      <AnimatePresence mode="wait">
-        {point ? (
-          <motion.div
-            key={point.city_id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18 }}
-            className="flex min-w-0 flex-1 items-center gap-3"
-          >
-            <span
-              className="h-8 w-1 shrink-0 rounded-full"
-              style={{ background: band?.color }}
-            />
-
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold text-fg">
-                {point.city_name ?? point.city_id}
-              </div>
-              <div className="truncate text-2xs text-fg-subtle">
-                {point.province}
-              </div>
-            </div>
-
-            <div className="ml-1 flex items-baseline gap-1">
-              <span className="metric text-xl text-fg">
-                {point.pm2_5_pred?.toFixed(1)}
-              </span>
-              <span className="text-2xs text-fg-faint">{UNIT}</span>
-            </div>
-
-            <span
-              className="shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-2xs font-bold"
-              style={{ background: band?.color, color: textOn(band?.color) }}
-            >
-              {band?.abbr}
-            </span>
-
-            <div className="ml-auto hidden items-center gap-4 text-2xs text-fg-subtle sm:flex">
-              <span className="font-mono">AQI {point.aqi_us}</span>
-              <span className="font-mono">+{horizon}h</span>
-              <span className="hidden md:inline">
-                {fmtPopulation(point.population)}
-              </span>
-              <span className="hidden font-medium text-accent lg:inline">
-                AI forecast
-              </span>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.span
-            key="idle"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-xs text-fg-subtle"
-          >
-            Hover a city for its forecast, or click to open its history.
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <CityTicker
+        features={points}
+        horizon={horizon}
+        onSelect={onSelectCity}
+        loading={loading}
+      />
     </div>
   );
 }

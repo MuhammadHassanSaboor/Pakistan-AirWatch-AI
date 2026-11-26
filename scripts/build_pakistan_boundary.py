@@ -51,10 +51,24 @@ DISPUTED = BASE + "ne_10m_admin_0_disputed_areas.geojson"
 
 DATA = Path(__file__).resolve().parents[1] / "frontend/src/data"
 
-# Natural Earth BRK_NAMEs that the official map shows as Pakistan.
-PAKISTAN_PARTS = {"Azad Kashmir", "Gilgit-Baltistan"}
+# Natural Earth BRK_NAMEs dissolved into the single Pakistan landmass.
+#
+# The whole of Jammu & Kashmir is included, which is what makes the
+# north read as one country with one border rather than a country with
+# a separate piece floating beside it. Siachen is in the list because
+# leaving it out punches a hole between Gilgit-Baltistan and Jammu &
+# Kashmir, and a hole in a national outline looks like a rendering bug.
+# Aksai Chin and the Shaksam Valley are deliberately NOT included:
+# they are Chinese-administered.
+PAKISTAN_PARTS = {
+    "Azad Kashmir",
+    "Gilgit-Baltistan",
+    "Jammu and Kashmir",
+    "Siachen Glacier",
+}
 
-# Labelled by name only, with no outline and no fill.
+# Named on the map. The area is inside the national outline and is not
+# shaded or outlined separately -- the label is the only marking.
 LABELLED = {"Jammu and Kashmir": "Indian Occupied Kashmir"}
 
 PRECISION = 4
@@ -92,7 +106,7 @@ def main() -> None:
         name = feature["properties"].get("BRK_NAME")
         if name in PAKISTAN_PARTS:
             pieces.append(shape(feature["geometry"]))
-        elif name in LABELLED:
+        if name in LABELLED:
             bounds = shape(feature["geometry"]).bounds
             labels.append(
                 {
@@ -127,8 +141,8 @@ def main() -> None:
                 "properties": {
                     "name": "Pakistan",
                     "note": (
-                        "Admin-0 polygon dissolved with Azad Jammu & Kashmir "
-                        "and Gilgit-Baltistan."
+                        "Admin-0 polygon dissolved with Azad Jammu & Kashmir, "
+                        "Gilgit-Baltistan, Jammu & Kashmir and Siachen."
                     ),
                     "source": "Natural Earth 10m (public domain)",
                 },

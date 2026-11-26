@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 
 import { aqiCategory } from "../lib/aqi";
 
@@ -23,6 +22,23 @@ import { aqiCategory } from "../lib/aqi";
  * without the number: as AQI climbs the sun dims and sinks behind more
  * haze layers, particle count and size rise, and the palette shifts
  * from clear blue through amber to deep maroon.
+ *
+ * Performance
+ * -----------
+ * Two rules keep a page full of these cheap, and both were learned
+ * from this one being the main cause of a janky page:
+ *
+ *  1. Every loop is a CSS keyframe, never a JS-driven one. Framer
+ *     Motion animates by writing styles from a rAF callback, so nine
+ *     scenes with thirty particles apiece meant hundreds of elements
+ *     being restyled from JavaScript every frame, on the same thread
+ *     that handles scrolling. CSS animations run on the compositor and
+ *     cost the main thread nothing once started.
+ *
+ *  2. Detail scales with rendered size. A 20px legend chip was drawing
+ *     thirty animated particles that occupy a fraction of a pixel
+ *     each. Below 44px the scene is drawn static, and the result is
+ *     indistinguishable -- there is nothing there to see moving.
  */
 
 /* Per-band scene parameters. Every value moves in one direction as
@@ -46,7 +62,7 @@ const SCENES = {
     sunY: 32,
     sunGlow: 0.85,
     haze: 1,
-    particles: 8,
+    particles: 7,
     particleSize: 1.6,
     particleColor: "#FDE68A",
   },
@@ -57,7 +73,7 @@ const SCENES = {
     sunY: 36,
     sunGlow: 0.6,
     haze: 2,
-    particles: 13,
+    particles: 10,
     particleSize: 1.9,
     particleColor: "#FED7AA",
   },
@@ -68,7 +84,7 @@ const SCENES = {
     sunY: 40,
     sunGlow: 0.42,
     haze: 3,
-    particles: 18,
+    particles: 13,
     particleSize: 2.2,
     particleColor: "#FECACA",
   },
@@ -79,7 +95,7 @@ const SCENES = {
     sunY: 45,
     sunGlow: 0.26,
     haze: 4,
-    particles: 24,
+    particles: 16,
     particleSize: 2.5,
     particleColor: "#E9D5FF",
   },
@@ -90,11 +106,15 @@ const SCENES = {
     sunY: 52,
     sunGlow: 0.12,
     haze: 5,
-    particles: 30,
+    particles: 18,
     particleSize: 2.9,
     particleColor: "#FDA4AF",
   },
 };
+
+/** Below this the scene is drawn static: there is nothing visible to
+ *  animate at chip size, and the cost is the same as at full size. */
+const ANIMATE_ABOVE = 44;
 
 /** Deterministic pseudo-random so particles don't re-scatter on every
  *  render — a jittering scene reads as a glitch, not as motion. */
@@ -135,20 +155,28 @@ export default function AqiScene({ aqi, size = 128, isDark: isDarkProp }) {
   const isDark = useIsDark(isDarkProp);
   const band = aqiCategory(aqi ?? 0);
   const scene = SCENES[band?.name] ?? SCENES.Good;
+  const animate = size >= ANIMATE_ABOVE;
 
-  const particles = useMemo(
-    () =>
-      Array.from({ length: scene.particles }, (_, i) => ({
+  const particles = useMemo(() => {
+    if (!animate) {
+      // Static scenes still show particulate, just fewer of it and
+      // without motion: it is texture at this size, not information.
+      return Array.from({ length: Math.min(5, scene.particles) }, (_, i) => ({
         id: i,
-        x: 8 + seeded(i, 1) * 84,
-        y: 55 + seeded(i, 2) * 42,
-        r: scene.particleSize * (0.6 + seeded(i, 3) * 0.8),
-        delay: seeded(i, 4) * 4,
-        duration: 5 + seeded(i, 5) * 5,
-        drift: (seeded(i, 6) - 0.5) * 14,
-      })),
-    [scene],
-  );
+        x: 12 + seeded(i, 1) * 76,
+        y: 58 + seeded(i, 2) * 34,
+        r: scene.particleSize * 0.9,
+      }));
+    }
+    return Array.from({ length: scene.particles }, (_, i) => ({
+      id: i,
+      x: 8 + seeded(i, 1) * 84,
+      y: 55 + seeded(i, 2) * 42,
+      r: scene.particleSize * (0.6 + seeded(i, 3) * 0.8),
+      delay: -seeded(i, 4) * 8,
+      duration: 5 + seeded(i, 5) * 5,
+    }));
+  }, [scene, animate]);
 
   const hazeBands = useMemo(
     () =>
@@ -157,7 +185,7 @@ export default function AqiScene({ aqi, size = 128, isDark: isDarkProp }) {
         y: 52 + i * 9,
         opacity: 0.12 + i * 0.07,
         duration: 9 + i * 2.5,
-        delay: i * 0.7,
+        delay: -i * 1.4,
       })),
     [scene],
   );
@@ -199,21 +227,23 @@ export default function AqiScene({ aqi, size = 128, isDark: isDarkProp }) {
         <rect width="100" height="100" fill={`url(#${uid}-sky)`} />
 
         {/* sun: glow, disc, and rays that only appear in clean air */}
-        <motion.circle
+        <circle
           cx="50"
           cy={scene.sunY}
           r="30"
           fill={`url(#${uid}-sunglow)`}
-          animate={{ scale: [1, 1.08, 1], opacity: [0.9, 1, 0.9] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          style={{ transformOrigin: `50px ${scene.sunY}px` }}
+          className={animate ? "aqi-breathe" : undefined}
+          style={
+            animate ? { transformOrigin: `50px ${scene.sunY}px` } : undefined
+          }
         />
 
         {scene.sunGlow > 0.5 ? (
-          <motion.g
-            animate={{ rotate: 360 }}
-            transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-            style={{ transformOrigin: `50px ${scene.sunY}px` }}
+          <g
+            className={animate ? "aqi-spin" : undefined}
+            style={
+              animate ? { transformOrigin: `50px ${scene.sunY}px` } : undefined
+            }
           >
             {Array.from({ length: 8 }, (_, i) => {
               const a = (i * Math.PI) / 4;
@@ -231,21 +261,14 @@ export default function AqiScene({ aqi, size = 128, isDark: isDarkProp }) {
                 />
               );
             })}
-          </motion.g>
+          </g>
         ) : null}
 
-        <motion.circle
-          cx="50"
-          cy={scene.sunY}
-          r="11"
-          fill={scene.sun}
-          animate={{ opacity: [0.85, 1, 0.85] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        />
+        <circle cx="50" cy={scene.sunY} r="11" fill={scene.sun} />
 
         {/* haze layers drifting across, more of them as air worsens */}
         {hazeBands.map((h) => (
-          <motion.ellipse
+          <ellipse
             key={h.id}
             cx="50"
             cy={h.y}
@@ -253,35 +276,36 @@ export default function AqiScene({ aqi, size = 128, isDark: isDarkProp }) {
             ry={5 + h.id * 1.2}
             fill={isDark ? "#0F172A" : "#FFFFFF"}
             opacity={h.opacity}
-            animate={{ x: [-18, 18, -18] }}
-            transition={{
-              duration: h.duration,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: h.delay,
-            }}
+            className={animate ? "aqi-drift" : undefined}
+            style={
+              animate
+                ? {
+                    animationDuration: `${h.duration}s`,
+                    animationDelay: `${h.delay}s`,
+                  }
+                : undefined
+            }
           />
         ))}
 
         {/* suspended particulate: the thing actually being measured */}
         {particles.map((p) => (
-          <motion.circle
+          <circle
             key={p.id}
             cx={p.x}
             cy={p.y}
             r={p.r}
             fill={scene.particleColor}
-            animate={{
-              y: [0, -10, 0],
-              x: [0, p.drift, 0],
-              opacity: [0.25, 0.85, 0.25],
-            }}
-            transition={{
-              duration: p.duration,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: p.delay,
-            }}
+            opacity={animate ? undefined : 0.55}
+            className={animate ? "aqi-rise" : undefined}
+            style={
+              animate
+                ? {
+                    animationDuration: `${p.duration}s`,
+                    animationDelay: `${p.delay}s`,
+                  }
+                : undefined
+            }
           />
         ))}
 

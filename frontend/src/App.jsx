@@ -32,7 +32,12 @@ function Card({ title, subtitle, action, children, delay = 0, className }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={`card card-hover flex flex-col ${className ?? ""}`}
+      // Analytics sit below the fold, and every one of them holds a
+      // Plotly canvas. `defer-paint` lets the browser skip their layout
+      // and paint until they are scrolled near, which is the difference
+      // between five canvases being re-measured on every resize and
+      // none of them being.
+      className={`card card-hover defer-paint flex flex-col ${className ?? ""}`}
     >
       <header className="card-head">
         <div className="min-w-0">

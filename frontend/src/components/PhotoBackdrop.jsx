@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-
 import { photoUrl } from "../lib/photos";
 
 /**
@@ -45,7 +43,14 @@ export default function PhotoBackdrop({
       aria-hidden
       className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
     >
-      <motion.img
+      {/* The drift is a CSS keyframe, not a JS loop: a 34-second
+          animation driven from requestAnimationFrame keeps the main
+          thread busy for its whole duration, for a 3.5% scale nobody
+          is watching closely. It also stays within a few percent --
+          the earlier 1.06-1.12 range enlarged a CDN image already
+          cropped to the box, and an upscaled photo looks soft however
+          good the source is. */}
+      <img
         src={photoUrl(photo.id, { w: width, h: height, q: quality })}
         alt=""
         loading="lazy"
@@ -53,26 +58,10 @@ export default function PhotoBackdrop({
         draggable={false}
         onLoad={() => setState("ready")}
         onError={() => setState("error")}
-        className="h-full w-full object-cover"
-        initial={{ opacity: 0, scale: 1.02 }}
-        animate={
-          state === "ready"
-            ? {
-                opacity: strength,
-                // The drift stays within a few percent. The earlier
-                // 1.06-1.12 range enlarged a CDN image already sized
-                // for the box, and an upscaled photo looks soft no
-                // matter how good the source is.
-                scale: pan ? [1, 1.035, 1] : 1,
-              }
-            : { opacity: 0, scale: 1.02 }
-        }
-        transition={{
-          opacity: { duration: 0.9, ease: "easeOut" },
-          scale: pan
-            ? { duration: 34, repeat: Infinity, ease: "easeInOut" }
-            : { duration: 0.9, ease: "easeOut" },
-        }}
+        className={`h-full w-full object-cover transition-opacity duration-700 ${
+          pan && state === "ready" ? "ken-burns" : ""
+        }`}
+        style={{ opacity: state === "ready" ? strength : 0 }}
       />
       <div
         className="absolute inset-0"
