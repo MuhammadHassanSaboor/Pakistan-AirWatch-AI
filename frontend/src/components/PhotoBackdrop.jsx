@@ -25,9 +25,11 @@ export default function PhotoBackdrop({
   photo,
   width = 800,
   height = 400,
-  quality = 62,
+  quality = 80,
   /** 0 = scrim only; 1 = full strength. Tunes how loud the image is. */
   strength = 1,
+  /** "strong" under unplated text, "soft" under cards that plate it. */
+  scrim = "strong",
   /** Slow Ken Burns drift. Off for small decorative corners. */
   pan = true,
   className = "",
@@ -52,14 +54,18 @@ export default function PhotoBackdrop({
         onLoad={() => setState("ready")}
         onError={() => setState("error")}
         className="h-full w-full object-cover"
-        initial={{ opacity: 0, scale: 1.06 }}
+        initial={{ opacity: 0, scale: 1.02 }}
         animate={
           state === "ready"
             ? {
                 opacity: strength,
-                scale: pan ? [1.06, 1.12, 1.06] : 1.02,
+                // The drift stays within a few percent. The earlier
+                // 1.06-1.12 range enlarged a CDN image already sized
+                // for the box, and an upscaled photo looks soft no
+                // matter how good the source is.
+                scale: pan ? [1, 1.035, 1] : 1,
               }
-            : { opacity: 0, scale: 1.06 }
+            : { opacity: 0, scale: 1.02 }
         }
         transition={{
           opacity: { duration: 0.9, ease: "easeOut" },
@@ -70,7 +76,10 @@ export default function PhotoBackdrop({
       />
       <div
         className="absolute inset-0"
-        style={{ background: "var(--photo-scrim)" }}
+        style={{
+          background:
+            scrim === "soft" ? "var(--photo-scrim-soft)" : "var(--photo-scrim)",
+        }}
       />
     </div>
   );

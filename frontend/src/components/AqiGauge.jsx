@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-import { AQI_BANDS, AQI_MAX, aqiCategory } from "../lib/aqi";
+import { AQI_BANDS, AQI_MAX, aqiCategory, textOn } from "../lib/aqi";
 
 /**
  * Radial AQI gauge.
@@ -103,7 +103,12 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
           initial={{ opacity: 0, scale: 0.6 }}
           animate={{ opacity: mounted ? 1 : 0, scale: 1 }}
           style={{ transformOrigin: `${cx}px ${cy}px` }}
-          transition={{ type: "spring", stiffness: 90, damping: 14, delay: 0.3 }}
+          transition={{
+            type: "spring",
+            stiffness: 90,
+            damping: 14,
+            delay: 0.3,
+          }}
         />
         <circle cx={cx} cy={cy} r={4} fill="rgb(var(--c-fg))" />
       </svg>
@@ -111,21 +116,25 @@ export default function AqiGauge({ aqi, size = 184, stroke = 13 }) {
       {/* centred readout */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <span className="eyebrow mb-0.5">AQI</span>
+        {/* Foreground, not band colour: as text, Moderate is 1.89:1 on
+            white and Hazardous 1.70:1 on dark, so the readout vanished
+            at one end of the scale or the other. The band is named on
+            the filled chip below, which reads at every step. */}
         <motion.span
           key={Math.round(value)}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="metric text-[2.6rem]"
-          style={{ color: band?.color }}
+          className="metric text-[2.6rem] text-fg"
         >
           {Math.round(value)}
         </motion.span>
         <span
-          className="mt-1 max-w-[7.5rem] text-center text-[10px] font-semibold leading-tight"
-          style={{ color: band?.color }}
+          className="mt-1.5 max-w-[8rem] rounded-md px-1.5 py-0.5 text-center
+                     text-[11px] font-bold leading-tight"
+          style={{ background: band?.color, color: textOn(band?.color) }}
         >
-          {band?.abbr === "USG" ? "Unhealthy for Sensitive" : band?.name}
+          {band?.abbr === "USG" ? "Sensitive groups" : band?.name}
         </span>
       </div>
     </div>

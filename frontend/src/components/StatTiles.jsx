@@ -12,7 +12,7 @@ import { AqiSceneChip } from "./AqiScene";
 import PhotoBackdrop from "./PhotoBackdrop";
 import { AnimatedNumber, Skeleton, fadeUp, stagger } from "./primitives";
 import { UNIT, fmtPopulation } from "../lib/format";
-import { AQI_BANDS, bandForPm25, pm25ToAqi } from "../lib/aqi";
+import { AQI_BANDS, bandForPm25, pm25ToAqi, textOn } from "../lib/aqi";
 import { bandPhoto } from "../lib/photos";
 
 /**
@@ -60,11 +60,15 @@ export default function StatTiles({
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
         className="card relative flex min-h-[22rem] flex-col overflow-hidden xl:col-span-5"
       >
+        {/* Soft scrim here too, now that the header, the gauge and the
+            body all sit on plates. With everything plated the image no
+            longer has to be suppressed to keep text readable, which is
+            the whole reason it looked washed out before. */}
         <PhotoBackdrop
           photo={bandPhoto(national?.name)}
           width={760}
-          height={360}
-          quality={64}
+          height={380}
+          scrim="soft"
         />
 
         {/* The band tint breathes, so the largest card on the page is
@@ -81,29 +85,30 @@ export default function StatTiles({
 
         <div className="relative flex flex-1 flex-col p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <AqiSceneChip aqi={nationalAqi} size={30} isDark={isDark} />
+            <div className="plate flex items-center gap-2.5 px-3 py-2">
+              <AqiSceneChip aqi={nationalAqi} size={32} isDark={isDark} />
               <div>
-                <div className="text-sm font-semibold tracking-tight text-fg">
+                <div className="text-base font-semibold tracking-tight text-fg">
                   National average
                 </div>
-                <div className="text-xs text-fg-subtle">
+                <div className="text-xs text-fg-muted">
                   {stats.cities_reporting} cities, all 7 provinces
                 </div>
               </div>
             </div>
 
+            {/* The band is the single most important word on the card,
+                so it is set at body size on an opaque plate rather than
+                as 11px caps floating over a photograph. */}
             <span
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full
-                         border px-2.5 py-1 text-2xs font-semibold uppercase
-                         tracking-wider"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3
+                         py-2 text-sm font-bold tracking-tight shadow-sm"
               style={{
-                borderColor: `${national?.color}59`,
-                background: `${national?.color}1A`,
-                color: national?.color,
+                background: national?.color,
+                color: textOn(national?.color),
               }}
             >
-              <Radio size={11} />
+              <Radio size={14} />
               {national?.abbr}
             </span>
           </div>
@@ -113,7 +118,7 @@ export default function StatTiles({
               other the value, and neither is the footnote. */}
           <div className="mt-5 flex flex-1 items-center gap-5 sm:gap-7">
             <motion.div
-              className="shrink-0"
+              className="plate shrink-0 !rounded-full p-1"
               initial={{ scale: 0.84, opacity: 0, rotate: -8 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 130, damping: 16 }}
@@ -121,21 +126,21 @@ export default function StatTiles({
               <AqiGauge aqi={nationalAqi} size={168} />
             </motion.div>
 
-            <div className="min-w-0 flex-1">
+            <div className="plate min-w-0 flex-1 p-3.5">
               <div className="flex items-end gap-2">
                 <AnimatedNumber
                   value={stats.national_mean_pm25}
                   digits={1}
                   className="metric text-[3.25rem] leading-none text-fg"
                 />
-                <span className="pb-2 text-sm font-medium text-fg-subtle">
+                <span className="pb-2 text-sm font-semibold text-fg-muted">
                   {UNIT}
                 </span>
               </div>
               <div className="mt-1.5 text-sm font-semibold text-fg-muted">
                 PM2.5 mass concentration
               </div>
-              <p className="mt-3 text-[13px] leading-relaxed text-fg-subtle">
+              <p className="mt-2.5 text-[13px] leading-relaxed text-fg-muted">
                 {national?.advice}
               </p>
             </div>
@@ -143,7 +148,7 @@ export default function StatTiles({
 
           {/* Footer strip: three real numbers at real sizes, divided by
               hairlines rather than floated in whitespace. */}
-          <div className="mt-5 grid grid-cols-3 rounded-xl border border-line bg-sunken/60 backdrop-blur-sm">
+          <div className="plate mt-5 grid grid-cols-3">
             <Stat
               label="Median"
               value={stats.national_median_pm25}
@@ -255,16 +260,18 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
           : undefined
       }
       title={clickable ? `Open ${city.city_name}` : undefined}
-      className={`card group relative flex min-h-[10.5rem] flex-col justify-between
+      className={`card group relative flex min-h-[12.5rem] flex-col justify-between
                  overflow-hidden p-4 sm:p-5 ${
                    clickable ? "cursor-pointer" : ""
                  }`}
     >
+      {/* Soft scrim, because every word on this card sits on a plate.
+          The photograph is allowed to actually look like a photograph. */}
       <PhotoBackdrop
         photo={bandPhoto(band?.name)}
-        width={420}
-        height={260}
-        quality={58}
+        width={440}
+        height={300}
+        scrim="soft"
       />
 
       <motion.div
@@ -276,54 +283,66 @@ function CityStat({ label, icon: Icon, city, band, isDark, onSelect }) {
         transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
       />
 
-      <div className="relative flex items-center gap-2">
-        {/* Scene beside the label rather than washed across the corner:
-            the photograph already owns the corner, and two illustrations
-            of the same sky in the same place read as a rendering bug. */}
+      {/* "Most polluted" was 11px caps at muted contrast over a photo,
+          which is unreadable however good the scrim is. It is now 13px
+          semibold at full foreground contrast on its own plate. */}
+      <div className="tag relative self-start !rounded-xl !py-1.5">
         <span className="transition-transform duration-300 group-hover:scale-110">
-          <AqiSceneChip aqi={city?.aqi_us} size={24} isDark={isDark} />
+          <AqiSceneChip aqi={city?.aqi_us} size={22} isDark={isDark} />
         </span>
-        <Icon size={13} style={{ color: band?.color }} />
-        <span className="text-2xs font-semibold uppercase tracking-[0.1em] text-fg-muted">
+        <Icon size={15} className="text-fg-muted" />
+        <span className="text-[13px] font-semibold tracking-tight text-fg">
           {label}
         </span>
       </div>
 
-      <div className="relative">
-        <div className="truncate text-2xl font-semibold tracking-tight text-fg">
-          {city?.city_name ?? "—"}
-        </div>
-        <div className="truncate text-xs text-fg-subtle">
-          {city?.province ?? ""}
-        </div>
-
-        <div className="mt-2.5 flex items-end gap-1.5">
-          <span
-            className="metric text-[2.25rem] leading-none"
-            style={{ color: band?.color }}
-          >
-            {city?.pm2_5?.toFixed(1) ?? "—"}
-          </span>
-          <span className="pb-1 text-2xs text-fg-faint">{UNIT}</span>
+      <div className="plate relative mt-3 p-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-2xl font-semibold tracking-tight text-fg">
+              {city?.city_name ?? "—"}
+            </div>
+            <div className="truncate text-xs font-medium text-fg-muted">
+              {city?.province ?? ""}
+            </div>
+          </div>
           <motion.span
-            className="mb-0.5 ml-auto shrink-0 rounded-md px-2 py-0.5 font-mono
-                       text-xs font-bold"
-            style={{ background: `${band?.color}26`, color: band?.color }}
-            animate={{ scale: [1, 1.05, 1] }}
+            className="shrink-0 rounded-lg px-2.5 py-1 font-mono text-[13px] font-bold shadow-sm"
+            style={{ background: band?.color, color: textOn(band?.color) }}
+            animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
           >
             AQI {city?.aqi_us ?? "—"}
           </motion.span>
         </div>
 
-        <div className="mt-2.5 flex items-center gap-3 text-xs text-fg-subtle">
+        <div className="mt-2 flex items-end gap-1.5">
+          {/* The numeral is foreground, not band colour: at Moderate the
+              band colour is 1.89:1 on white. The band is carried by the
+              filled chip beside it, which is readable at every step. */}
+          <span className="metric text-[2.25rem] leading-none text-fg">
+            {city?.pm2_5?.toFixed(1) ?? "—"}
+          </span>
+          <span className="pb-1 text-xs font-medium text-fg-muted">{UNIT}</span>
+          <span
+            className="mb-1 ml-auto shrink-0 rounded-md px-2 py-0.5 text-[13px] font-bold"
+            style={{ background: band?.color, color: textOn(band?.color) }}
+          >
+            {band?.abbr}
+          </span>
+        </div>
+
+        <div
+          className="mt-2.5 flex items-center gap-3.5 border-t pt-2 text-xs font-medium text-fg-muted"
+          style={{ borderColor: "var(--hairline)" }}
+        >
           <span className="flex min-w-0 items-center gap-1.5">
-            <Users size={12} className="shrink-0 text-fg-faint" />
+            <Users size={13} className="shrink-0 text-fg-subtle" />
             <span className="truncate">{fmtPopulation(city?.population)}</span>
           </span>
           {Number.isFinite(city?.elevation_m) ? (
             <span className="flex shrink-0 items-center gap-1.5">
-              <Mountain size={12} className="shrink-0 text-fg-faint" />
+              <Mountain size={13} className="shrink-0 text-fg-subtle" />
               <span>{Math.round(city.elevation_m)} m</span>
             </span>
           ) : null}
@@ -461,7 +480,7 @@ function StatSkeleton() {
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:col-span-4">
         {[0, 1].map((i) => (
-          <div key={i} className="card min-h-[10.5rem] p-5">
+          <div key={i} className="card min-h-[12.5rem] p-5">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="mt-5 h-7 w-32" />
             <Skeleton className="mt-3 h-9 w-24" />

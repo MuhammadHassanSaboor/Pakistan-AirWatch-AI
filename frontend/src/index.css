@@ -64,16 +64,26 @@
     /* Scrim over photography. Two stops, not one: a flat overlay mutes
        a photo evenly and leaves text sitting on mid-grey, while a
        gradient keeps the image bright where nothing is written. */
-    /* Radial, not linear. A linear scrim leaves one whole edge lightly
-       covered, and that edge always turns out to be where some text
-       lives. This keeps a clear window in the top-right corner -- where
-       nothing is ever written -- and goes near-solid everywhere else. */
+    /* Two strengths, because the two jobs are different.
+       `strong` sits under large unplated text -- the hero's numerals
+       and its paragraph of advice -- so it has to carry the contrast
+       itself. `soft` sits under cards whose text is on its own plate,
+       so it only has to stop the photo shouting. Earlier both used the
+       strong value, which is why the photographs looked washed out:
+       the scrim was doing legibility work that a plate does better. */
     --photo-scrim: radial-gradient(
-      135% 125% at 88% 0%,
-      rgb(18 18 23 / 0.3) 0%,
-      rgb(18 18 23 / 0.72) 32%,
-      rgb(18 18 23 / 0.93) 58%,
-      rgb(18 18 23 / 0.985) 78%
+      140% 130% at 90% 0%,
+      rgb(18 18 23 / 0.1) 0%,
+      rgb(18 18 23 / 0.52) 30%,
+      rgb(18 18 23 / 0.86) 56%,
+      rgb(18 18 23 / 0.96) 76%
+    );
+    --photo-scrim-soft: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(18 18 23 / 0) 0%,
+      rgb(18 18 23 / 0.18) 34%,
+      rgb(18 18 23 / 0.42) 62%,
+      rgb(18 18 23 / 0.58) 85%
     );
 
     color-scheme: dark;
@@ -115,11 +125,18 @@
     --glow-a: rgba(37, 86, 212, 0.06);
     --glow-b: rgba(4, 120, 87, 0.04);
     --photo-scrim: radial-gradient(
-      135% 125% at 88% 0%,
-      rgb(255 255 255 / 0.4) 0%,
-      rgb(255 255 255 / 0.8) 32%,
-      rgb(255 255 255 / 0.95) 58%,
-      rgb(255 255 255 / 0.99) 78%
+      140% 130% at 90% 0%,
+      rgb(255 255 255 / 0.2) 0%,
+      rgb(255 255 255 / 0.62) 30%,
+      rgb(255 255 255 / 0.9) 56%,
+      rgb(255 255 255 / 0.97) 76%
+    );
+    --photo-scrim-soft: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(255 255 255 / 0.04) 0%,
+      rgb(255 255 255 / 0.26) 34%,
+      rgb(255 255 255 / 0.5) 62%,
+      rgb(255 255 255 / 0.66) 85%
     );
 
     color-scheme: light;
@@ -245,6 +262,26 @@
       var(--shadow-float),
       0 0 0 1px rgb(var(--c-accent) / 0.16),
       0 0 32px -14px rgb(var(--c-accent) / 0.4);
+  }
+
+  /* A legibility plate: the panel text sits on when there is a
+     photograph behind it. This is what lets the image stay bright --
+     contrast is guaranteed by the plate, in both themes, instead of by
+     flooding the whole card with scrim. */
+  .plate {
+    @apply rounded-xl border backdrop-blur-md;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-surface) / 0.84);
+  }
+
+  /* Small caps label that has to survive sitting over imagery: large
+     enough to read, and on its own plate rather than floating. */
+  .tag {
+    @apply inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1
+           text-[13px] font-semibold tracking-tight backdrop-blur-md;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-surface) / 0.88);
+    color: rgb(var(--c-fg));
   }
 
   .card-head {

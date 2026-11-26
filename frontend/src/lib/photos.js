@@ -19,6 +19,12 @@
  * and `q` trades a little detail for bytes. A card that needs a 640px
  * backdrop therefore downloads a 640px file, not a 4000px one.
  *
+ * Quality defaults to 80, not the 60 these URLs ship with. At 60 an
+ * image with a large smooth area -- which is every one of these, since
+ * sky is most of the frame -- bands and smears, and the result reads as
+ * "blurry photo" rather than "compressed photo". The extra bytes are
+ * perhaps 40 KB per card, which is cheaper than the look.
+ *
  * The Unsplash License does not require attribution, but crediting a
  * photographer whose work carries your UI costs one line, so the
  * credits are rendered in the footer.
@@ -75,7 +81,7 @@ export const BAND_PHOTOS = {
  * @param {number} q    JPEG/WebP quality, 1-100
  * @param {number} dpr  device pixel ratio to serve for
  */
-export function photoUrl(id, { w = 800, h = 400, q = 62, dpr = 2 } = {}) {
+export function photoUrl(id, { w = 800, h = 400, q = 80, dpr = 2 } = {}) {
   const params = new URLSearchParams({
     auto: "format",
     fit: "crop",
