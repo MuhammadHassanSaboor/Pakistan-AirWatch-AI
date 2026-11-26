@@ -448,6 +448,29 @@ def create_app(registry: CollectorRegistry | None = None) -> Flask:
 
         worst = vals.idxmax()
         best = vals.idxmin()
+
+        def extreme(city_id: str) -> dict:
+            """The extremes carry their context, not just a number.
+
+            A reader asking "how bad is the worst city?" immediately asks
+            "and how many people live there?", so the answer ships with
+            the question rather than needing a second request.
+            """
+            row = cities.loc[city_id]
+            value = float(vals[city_id])
+            out = {
+                "city_id": city_id,
+                "city_name": row["city_name"],
+                "province": row["province"],
+                "pm2_5": round(value, 1),
+                **aqi.describe(value),
+            }
+            for field in ("population", "elevation_m"):
+                raw = row.get(field)
+                if raw is not None and pd.notna(raw):
+                    out[field] = int(raw)
+            return out
+
         bands: dict[str, int] = {}
         for v in vals:
             cat = aqi.aqi_category(aqi.pm25_to_aqi(float(v)))
@@ -460,18 +483,8 @@ def create_app(registry: CollectorRegistry | None = None) -> Flask:
                     "cities_reporting": int(len(vals)),
                     "national_mean_pm25": round(float(vals.mean()), 1),
                     "national_median_pm25": round(float(vals.median()), 1),
-                    "worst": {
-                        "city_id": worst,
-                        "city_name": cities.loc[worst, "city_name"],
-                        "pm2_5": round(float(vals[worst]), 1),
-                        **aqi.describe(float(vals[worst])),
-                    },
-                    "best": {
-                        "city_id": best,
-                        "city_name": cities.loc[best, "city_name"],
-                        "pm2_5": round(float(vals[best]), 1),
-                        **aqi.describe(float(vals[best])),
-                    },
+                    "worst": extreme(worst),
+                    "best": extreme(best),
                     "category_counts": bands,
                     "observed_at": str(latest["timestamp"].max()),
                     "generated_at": datetime.now(UTC).isoformat(),

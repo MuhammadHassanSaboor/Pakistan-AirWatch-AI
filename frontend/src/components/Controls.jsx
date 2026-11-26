@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { AqiSceneChip } from "./AqiScene";
 import { Layers, Maximize2, Search, X } from "lucide-react";
 import clsx from "clsx";
 import { useMemo, useState } from "react";
@@ -195,9 +196,11 @@ export function Legend({ bands, standard }) {
               transition={{ delay: i * 0.035, duration: 0.3 }}
               className="flex items-center gap-2.5 py-0.5"
             >
-              <span
-                className="h-3 w-3 shrink-0 rounded-sm"
-                style={{ background: b.color }}
+              {/* The swatch is the scene itself, so the scale teaches
+                  what each band looks like, not just its colour. */}
+              <AqiSceneChip
+                aqi={(b.aqi_lower ?? AQI_BANDS[i].lower) + 1}
+                size={20}
               />
               <span className="flex-1 truncate text-xs text-fg-muted">
                 {name}
@@ -212,8 +215,10 @@ export function Legend({ bands, standard }) {
         })}
       </div>
 
-      <p className="mt-3.5 border-t pt-2.5 text-[11px] leading-relaxed text-fg-faint"
-         style={{ borderColor: "var(--hairline)" }}>
+      <p
+        className="mt-3.5 border-t pt-2.5 text-[11px] leading-relaxed text-fg-faint"
+        style={{ borderColor: "var(--hairline)" }}
+      >
         Ranges in {UNIT}. Colours follow the{" "}
         <span className="text-fg-subtle">{standard ?? "US EPA"}</span> AQI
         breakpoints for PM2.5.

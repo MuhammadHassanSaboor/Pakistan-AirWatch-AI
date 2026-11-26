@@ -47,15 +47,15 @@ const STATES = {
 };
 
 const TONES = {
-  ok: "border-emerald-400/25 bg-emerald-400/[0.07] text-emerald-200/90",
-  warn: "border-amber-400/25 bg-amber-400/[0.07] text-amber-100/90",
-  bad: "border-red-400/25 bg-red-400/[0.07] text-red-200/90",
+  ok: "border-ok/30 bg-ok/[0.08] text-ok",
+  warn: "border-warn/30 bg-warn/[0.08] text-warn",
+  bad: "border-danger/30 bg-danger/[0.08] text-danger",
 };
 
 const ICON_TONES = {
-  ok: "text-emerald-400",
-  warn: "text-amber-400",
-  bad: "text-red-400",
+  ok: "text-ok",
+  warn: "text-warn",
+  bad: "text-danger",
 };
 
 export default function DataSourceBanner({ health }) {
@@ -81,7 +81,10 @@ export default function DataSourceBanner({ health }) {
           TONES[state.tone],
         )}
       >
-        <Icon size={15} className={clsx("mt-0.5 shrink-0", ICON_TONES[state.tone])} />
+        <Icon
+          size={15}
+          className={clsx("mt-0.5 shrink-0", ICON_TONES[state.tone])}
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

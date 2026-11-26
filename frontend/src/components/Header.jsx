@@ -1,12 +1,19 @@
 import { motion } from "framer-motion";
-import { Activity, CircleAlert, Moon, RefreshCw, Sun, Wind } from "lucide-react";
+import {
+  Activity,
+  CircleAlert,
+  Moon,
+  RefreshCw,
+  Sun,
+  Wind,
+} from "lucide-react";
 import clsx from "clsx";
 
 import { EASE } from "./primitives";
 import { fmtRelative } from "../lib/format";
 
 function StatusDot({ ok, degraded }) {
-  const color = ok ? "bg-emerald-400" : degraded ? "bg-amber-400" : "bg-red-400";
+  const color = ok ? "bg-ok" : degraded ? "bg-warn" : "bg-danger";
   return (
     <span className="relative flex h-2 w-2">
       {ok ? (
@@ -18,7 +25,9 @@ function StatusDot({ ok, degraded }) {
           )}
         />
       ) : null}
-      <span className={clsx("relative inline-flex h-2 w-2 rounded-full", color)} />
+      <span
+        className={clsx("relative inline-flex h-2 w-2 rounded-full", color)}
+      />
     </span>
   );
 }
@@ -64,7 +73,10 @@ export default function Header({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* model */}
           {modelInfo?.model_version ? (
-            <div className="chip" title={`Run ${modelInfo.run_id ?? "unknown"}`}>
+            <div
+              className="chip"
+              title={`Run ${modelInfo.run_id ?? "unknown"}`}
+            >
               <Activity size={12} className="text-accent" />
               <span className="font-mono">
                 {modelInfo.algorithm} v{modelInfo.model_version}
@@ -87,10 +99,10 @@ export default function Header({
             className={clsx(
               "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
               ok
-                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                ? "border-ok/35 bg-ok/12 text-ok"
                 : degraded
-                  ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                  : "border-red-400/30 bg-red-400/10 text-red-300",
+                  ? "border-warn/35 bg-warn/12 text-warn"
+                  : "border-danger/35 bg-danger/12 text-danger",
             )}
             title={health?.reason ?? undefined}
           >
@@ -100,12 +112,28 @@ export default function Header({
 
           <button
             type="button"
-            onClick={onToggleTheme}
+            onClick={(e) => {
+              // Grow the reveal circle from the button itself, so the
+              // sweep visibly starts where the user clicked.
+              const r = e.currentTarget.getBoundingClientRect();
+              onToggleTheme({
+                x: r.left + r.width / 2,
+                y: r.top + r.height / 2,
+              });
+            }}
             className="btn !px-2.5"
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
           >
-            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+            <motion.span
+              key={theme}
+              initial={{ rotate: -90, opacity: 0, scale: 0.6 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 18 }}
+              className="flex"
+            >
+              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+            </motion.span>
           </button>
 
           <button
@@ -127,13 +155,13 @@ export default function Header({
       {/* The disclaimer is permanent and non-dismissible. This is an
           academic prototype and must never be mistaken for an official
           health-warning service. */}
-      <div className="border-t border-amber-400/15 bg-amber-400/[0.06]">
+      <div className="border-t border-warn/15 bg-warn/[0.07]">
         <div className="mx-auto flex max-w-[1800px] items-center gap-2 px-4 py-1.5 sm:px-6">
-          <CircleAlert size={12} className="shrink-0 text-amber-400/90" />
-          <p className="text-xs leading-snug text-amber-200/75">
+          <CircleAlert size={12} className="shrink-0 text-warn" />
+          <p className="text-xs leading-snug text-warn/85">
             Academic MLOps prototype. Not an official public-health warning
-            system. Most cities show modelled estimates, not sensor readings &mdash;
-            every value is labelled with its source.
+            system. Most cities show modelled estimates, not sensor readings
+            &mdash; every value is labelled with its source.
           </p>
         </div>
       </div>
