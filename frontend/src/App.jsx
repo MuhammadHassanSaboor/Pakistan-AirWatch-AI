@@ -17,6 +17,7 @@ import {
 import { ErrorState, Skeleton, fadeUp } from "./components/primitives";
 import Footer from "./components/Footer";
 
+import { aqiCategory } from "./lib/aqi";
 import { api } from "./api/client";
 import { useApi, usePolling } from "./hooks/useApi";
 import { useTheme } from "./hooks/useTheme";
@@ -53,6 +54,7 @@ export default function App() {
   const [horizon, setHorizon] = useState(24);
   const [selectedCity, setSelectedCity] = useState(null);
   const [resetSignal, setResetSignal] = useState(0);
+  const [bandFilter, setBandFilter] = useState(null);
   const { theme, toggle: toggleTheme, isDark } = useTheme();
 
   const health = useApi(() => api.health(), []);
@@ -79,7 +81,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCity]);
 
-  const features = forecast.data?.features ?? [];
+  // Memoised so the empty-array fallback is not a new array on every
+  // render, which would defeat every downstream useMemo.
+  const features = useMemo(
+    () => forecast.data?.features ?? [],
+    [forecast.data],
+  );
+
+  // Clicking a category in the KPI spread narrows the map to that band.
+  // The band is recomputed here rather than read from the API field, so
+  // the filter can never disagree with the colour the marker is drawn
+  // in -- both come from the same breakpoint table.
+  const visibleFeatures = useMemo(() => {
+    if (!bandFilter) return features;
+    return features.filter((f) => aqiCategory(f.aqi_us)?.name === bandFilter);
+  }, [features, bandFilter]);
 
   // Only treat the API as down when the two cheapest calls BOTH fail.
   // One slow endpoint should degrade one panel, not blank the page.
@@ -160,13 +176,14 @@ python -m src.serving.app`}
                 <ErrorState error={forecast.error} onRetry={forecast.refetch} />
               ) : (
                 <MapView
-                  features={features}
+                  features={visibleFeatures}
                   loading={forecast.loading}
                   selectedCity={selectedCity}
                   onSelectCity={setSelectedCity}
                   resetSignal={resetSignal}
                   onReset={() => {
                     setSelectedCity(null);
+                    setBandFilter(null);
                     setResetSignal((n) => n + 1);
                   }}
                   theme={theme}
@@ -194,6 +211,29 @@ python -m src.serving.app`}
               </div>
 
               <div className="divider" />
+
+              {/* Only shown while a category filter is active, and it is
+                  the control that clears it: a map quietly showing 22 of
+                  134 cities with no visible reason is a bug report. */}
+              {bandFilter ? (
+                <>
+                  <div>
+                    <span className="eyebrow">Showing category</span>
+                    <button
+                      type="button"
+                      onClick={() => setBandFilter(null)}
+                      className="btn btn-accent mt-2 w-full justify-between"
+                      title="Clear the filter and show every city"
+                    >
+                      <span className="truncate">{bandFilter}</span>
+                      <span className="shrink-0 font-mono">
+                        {visibleFeatures.length} &times;
+                      </span>
+                    </button>
+                  </div>
+                  <div className="divider" />
+                </>
+              ) : null}
 
               <div>
                 <span className="eyebrow">Find a city</span>

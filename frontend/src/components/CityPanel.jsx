@@ -12,7 +12,7 @@ import {
 import { EASE, ErrorState, Skeleton, SourceBadge } from "./primitives";
 import { TrendChart } from "./charts";
 import AqiScene from "./AqiScene";
-import { bandForPm25, pm25ToAqi } from "../lib/aqi";
+import { bandForPm25, pm25ToAqi, textOn } from "../lib/aqi";
 import {
   UNIT,
   fmtNumber,
@@ -140,17 +140,19 @@ function Content({ data, loading, error, onClose, onRetry, theme }) {
             <div className="flex items-end justify-between gap-3">
               <div>
                 <div className="flex items-baseline gap-1.5">
-                  <span
-                    className="font-mono text-4xl font-bold tabular-nums leading-none"
-                    style={{ color: band?.color }}
-                  >
+                  <span className="font-mono text-4xl font-bold tabular-nums leading-none text-fg">
                     {fmtNumber(latest.pm2_5)}
                   </span>
                   <span className="text-xs text-fg-subtle">{UNIT}</span>
                 </div>
+                {/* Filled chip, not coloured text: see textOn() for why
+                    band colours cannot be used as text in both themes. */}
                 <div
-                  className="mt-1.5 text-xs font-semibold"
-                  style={{ color: band?.color }}
+                  className="mt-2 inline-block rounded-md px-2 py-0.5 text-xs font-bold"
+                  style={{
+                    background: band?.color,
+                    color: textOn(band?.color),
+                  }}
                 >
                   {band?.name ?? "Unknown"}
                 </div>

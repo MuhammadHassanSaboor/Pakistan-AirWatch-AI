@@ -22,7 +22,13 @@ import clsx from "clsx";
 import "leaflet/dist/leaflet.css";
 
 import { BASEMAPS, DEFAULT_BASEMAP, getBasemap } from "../lib/basemaps";
-import { AQI_BANDS, bandForPm25, colorForPm25, radiusForCity } from "../lib/aqi";
+import {
+  AQI_BANDS,
+  bandForPm25,
+  colorForPm25,
+  radiusForCity,
+  textOn,
+} from "../lib/aqi";
 import { UNIT, fmtPopulation } from "../lib/format";
 
 const PK_CENTER = [30.3753, 69.3451];
@@ -194,7 +200,8 @@ export default function MapView({
   const points = useMemo(
     () =>
       (features ?? []).filter(
-        (f) => f.latitude != null && f.longitude != null && f.pm2_5_pred != null,
+        (f) =>
+          f.latitude != null && f.longitude != null && f.pm2_5_pred != null,
       ),
     [features],
   );
@@ -244,7 +251,10 @@ export default function MapView({
         />
 
         {showLabels && basemap.labels ? (
-          <Pane name="map-labels" style={{ zIndex: 620, pointerEvents: "none" }}>
+          <Pane
+            name="map-labels"
+            style={{ zIndex: 620, pointerEvents: "none" }}
+          >
             <TileLayer
               key={`labels-${basemap.id}`}
               url={basemap.labels}
@@ -401,23 +411,25 @@ function MarkerTooltip({ point }) {
           <div className="text-[10px] text-fg-faint">{point.province}</div>
         </div>
         <span
-          className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold"
-          style={{ background: `${band?.color}26`, color: band?.color }}
+          className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold"
+          style={{ background: band?.color, color: textOn(band?.color) }}
         >
           AQI {point.aqi_us}
         </span>
       </div>
 
       <div className="mt-3 flex items-end gap-1.5">
-        <span className="metric text-[28px]" style={{ color: band?.color }}>
+        <span className="metric text-[28px] text-fg">
           {point.pm2_5_pred?.toFixed(1)}
         </span>
         <span className="pb-1 text-[10px] text-fg-faint">{UNIT}</span>
       </div>
 
+      {/* Filled, with text picked for contrast: a 10% tint behind
+          band-coloured text is unreadable at both ends of the scale. */}
       <div
-        className="mt-2 rounded-md px-2 py-1 text-center text-[10px] font-semibold"
-        style={{ background: `${band?.color}1A`, color: band?.color }}
+        className="mt-2 rounded-md px-2 py-1 text-center text-[11px] font-bold"
+        style={{ background: band?.color, color: textOn(band?.color) }}
       >
         {band?.name}
       </div>

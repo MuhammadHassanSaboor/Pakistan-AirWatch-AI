@@ -134,3 +134,54 @@ export function radiusForCity(population, zoom = 5) {
   const zoomFactor = 1 + (zoom - 5) * 0.28;
   return Math.max(5, Math.min(26, base * 7 * zoomFactor));
 }
+
+/**
+ * Pick black or white text for a solid band-coloured background.
+ *
+ * Why this exists: an AQI band colour used as TEXT cannot be made
+ * readable in both themes, because the six colours span the whole
+ * lightness range. Measured against the two surfaces:
+ *
+ *            as text on white    as text on dark
+ *   Good          2.87:1              6.51:1
+ *   Moderate      1.89:1              9.89:1
+ *   USG           2.55:1              7.32:1
+ *   Unhealthy     3.90:1              4.79:1
+ *   Very Unhlth   6.31:1              2.96:1
+ *   Hazardous    10.99:1              1.70:1
+ *
+ * Moderate disappears on white; Hazardous disappears on dark. No
+ * single rule fixes both, which is why band labels are drawn as a
+ * filled chip instead: the band colour becomes the background and the
+ * text is whichever of black or white contrasts with it. That lands
+ * every band between 5.07:1 and 10.99:1, in both themes, and the
+ * published colour is still exactly what the reader sees.
+ */
+const INK = "#0A0A0C";
+const PAPER = "#FFFFFF";
+
+function channel(value) {
+  const c = value / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of a #rrggbb string. */
+function luminance(hex) {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) =>
+    channel(parseInt(h.slice(i, i + 2), 16)),
+  );
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Contrast ratio between two #rrggbb colours. */
+export function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The more readable of black or white on top of `background`. */
+export function textOn(background) {
+  if (!background) return PAPER;
+  return contrast(PAPER, background) >= contrast(INK, background) ? PAPER : INK;
+}

@@ -20,29 +20,32 @@
 @layer base {
   :root,
   [data-theme="dark"] {
-    --c-canvas: 7 10 18; /* #070A12 */
-    --c-surface: 14 19 31; /* #0E131F */
-    --c-raised: 21 28 43; /* #151C2B */
-    --c-sunken: 10 14 24;
-    --c-line: 29 38 56; /* hairline */
-    --c-line-strong: 50 64 90;
+    /* Graphite, not navy. Blue-tinted greys fight the data: a navy
+       surface sits on the same axis as the accent and the Good/Moderate
+       swatches, so everything reads as faintly related. True neutral
+       greys make a coloured pixel mean something. */
+    --c-canvas: 9 9 12; /* #09090C */
+    --c-surface: 18 18 23; /* #121217 */
+    --c-raised: 28 28 35; /* #1C1C23 */
+    --c-sunken: 13 13 17;
+    --c-line: 38 38 47; /* hairline */
+    --c-line-strong: 64 64 78;
 
-    --c-fg: 248 250 252; /* 17:1 */
-    --c-fg-muted: 165 174 190; /* 8.2:1 */
-    --c-fg-subtle: 123 133 151; /* 4.9:1 */
-    --c-fg-faint: 88 97 113;
+    --c-fg: 250 250 252; /* 18:1 */
+    --c-fg-muted: 178 178 190; /* 9.1:1 */
+    --c-fg-subtle: 132 132 146; /* 5.2:1 */
+    --c-fg-faint: 97 97 110;
 
-    /* Azure, not teal. An air-quality app should read as sky, and
-       azure also stays clear of every AQI swatch (green, amber,
-       orange, red, violet, maroon) so the accent is never mistaken
-       for a severity colour. */
-    --c-accent: 56 189 248;
-    --c-accent-soft: 125 211 252;
-    --c-accent-strong: 14 165 233;
+    /* Cobalt. Deeper and less toy-like than sky blue, and the hue sits
+       between the AQI green and the AQI violet without touching
+       either, so the accent is never mistaken for a severity. */
+    --c-accent: 96 145 255; /* #6091FF */
+    --c-accent-soft: 150 184 255;
+    --c-accent-strong: 59 110 224;
 
-    --c-ok: 52 211 153;
-    --c-warn: 251 191 36;
-    --c-danger: 248 113 113;
+    --c-ok: 45 212 160;
+    --c-warn: 250 189 60;
+    --c-danger: 251 113 113;
 
     /* Layered shadows read as real elevation; a single large blur
        reads as a smudge. */
@@ -54,34 +57,60 @@
       0 2px 4px rgb(0 0 0 / 0.5), 0 8px 20px -6px rgb(0 0 0 / 0.55),
       0 24px 56px -20px rgb(0 0 0 / 0.7);
 
-    --hairline: rgb(255 255 255 / 0.06);
-    --sheen: rgb(255 255 255 / 0.04);
-    --glow-a: rgba(56, 189, 248, 0.09);
-    --glow-b: rgba(129, 140, 248, 0.07);
+    --hairline: rgb(255 255 255 / 0.07);
+    --sheen: rgb(255 255 255 / 0.05);
+    --glow-a: rgba(96, 145, 255, 0.1);
+    --glow-b: rgba(45, 212, 160, 0.05);
+    /* Scrim over photography. Two stops, not one: a flat overlay mutes
+       a photo evenly and leaves text sitting on mid-grey, while a
+       gradient keeps the image bright where nothing is written. */
+    /* Two strengths, because the two jobs are different.
+       `strong` sits under large unplated text -- the hero's numerals
+       and its paragraph of advice -- so it has to carry the contrast
+       itself. `soft` sits under cards whose text is on its own plate,
+       so it only has to stop the photo shouting. Earlier both used the
+       strong value, which is why the photographs looked washed out:
+       the scrim was doing legibility work that a plate does better. */
+    --photo-scrim: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(18 18 23 / 0.1) 0%,
+      rgb(18 18 23 / 0.52) 30%,
+      rgb(18 18 23 / 0.86) 56%,
+      rgb(18 18 23 / 0.96) 76%
+    );
+    --photo-scrim-soft: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(18 18 23 / 0) 0%,
+      rgb(18 18 23 / 0.18) 34%,
+      rgb(18 18 23 / 0.42) 62%,
+      rgb(18 18 23 / 0.58) 85%
+    );
 
     color-scheme: dark;
   }
 
   [data-theme="light"] {
-    --c-canvas: 249 250 251;
+    --c-canvas: 247 247 249;
     --c-surface: 255 255 255;
-    --c-raised: 246 247 249;
-    --c-sunken: 241 243 246;
-    --c-line: 228 231 237;
-    --c-line-strong: 203 208 218;
+    --c-raised: 243 243 246;
+    --c-sunken: 237 237 241;
+    --c-line: 227 227 233;
+    --c-line-strong: 198 198 208;
 
-    --c-fg: 11 15 25; /* 17:1 on white */
-    --c-fg-muted: 76 86 104; /* 7.6:1 */
-    --c-fg-subtle: 110 120 138; /* 4.6:1 */
-    --c-fg-faint: 148 158 175;
+    --c-fg: 15 15 20; /* 17:1 on white */
+    --c-fg-muted: 78 78 90; /* 7.4:1 */
+    --c-fg-subtle: 110 110 124; /* 4.9:1 */
+    --c-fg-faint: 146 146 160;
 
-    --c-accent: 2 132 199;
-    --c-accent-soft: 3 105 161;
-    --c-accent-strong: 7 89 133;
+    /* The light theme needs a far darker accent for the same job: the
+       dark theme's cobalt is only 2.4:1 on white. */
+    --c-accent: 37 86 212; /* 5.9:1 */
+    --c-accent-soft: 29 68 170;
+    --c-accent-strong: 23 54 136;
 
-    --c-ok: 16 145 93;
-    --c-warn: 180 124 10;
-    --c-danger: 208 58 54;
+    --c-ok: 4 120 87; /* 5.1:1 */
+    --c-warn: 146 94 6; /* 5.2:1 */
+    --c-danger: 198 40 40; /* 5.0:1 */
 
     --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
     --shadow-card:
@@ -91,10 +120,24 @@
       0 2px 4px rgb(16 24 40 / 0.06), 0 8px 20px -6px rgb(16 24 40 / 0.1),
       0 24px 48px -16px rgb(16 24 40 / 0.16);
 
-    --hairline: rgb(16 24 40 / 0.07);
+    --hairline: rgb(9 9 12 / 0.08);
     --sheen: rgb(255 255 255 / 0.7);
-    --glow-a: rgba(2, 132, 199, 0.07);
-    --glow-b: rgba(99, 102, 241, 0.05);
+    --glow-a: rgba(37, 86, 212, 0.06);
+    --glow-b: rgba(4, 120, 87, 0.04);
+    --photo-scrim: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(255 255 255 / 0.2) 0%,
+      rgb(255 255 255 / 0.62) 30%,
+      rgb(255 255 255 / 0.9) 56%,
+      rgb(255 255 255 / 0.97) 76%
+    );
+    --photo-scrim-soft: radial-gradient(
+      140% 130% at 90% 0%,
+      rgb(255 255 255 / 0.04) 0%,
+      rgb(255 255 255 / 0.26) 34%,
+      rgb(255 255 255 / 0.5) 62%,
+      rgb(255 255 255 / 0.66) 85%
+    );
 
     color-scheme: light;
   }
@@ -219,6 +262,26 @@
       var(--shadow-float),
       0 0 0 1px rgb(var(--c-accent) / 0.16),
       0 0 32px -14px rgb(var(--c-accent) / 0.4);
+  }
+
+  /* A legibility plate: the panel text sits on when there is a
+     photograph behind it. This is what lets the image stay bright --
+     contrast is guaranteed by the plate, in both themes, instead of by
+     flooding the whole card with scrim. */
+  .plate {
+    @apply rounded-xl border backdrop-blur-md;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-surface) / 0.84);
+  }
+
+  /* Small caps label that has to survive sitting over imagery: large
+     enough to read, and on its own plate rather than floating. */
+  .tag {
+    @apply inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1
+           text-[13px] font-semibold tracking-tight backdrop-blur-md;
+    border-color: var(--hairline);
+    background-color: rgb(var(--c-surface) / 0.88);
+    color: rgb(var(--c-fg));
   }
 
   .card-head {
