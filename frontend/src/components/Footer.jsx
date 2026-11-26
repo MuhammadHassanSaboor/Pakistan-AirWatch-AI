@@ -3,113 +3,69 @@ import { ExternalLink, Github } from "lucide-react";
 import { photoCredits } from "../lib/photos";
 
 /**
- * Attribution is a licence condition, not decoration: Open-Meteo,
- * OpenAQ, PAQI and GeoNames are all CC BY, and the free Open-Meteo
- * tier is non-commercial. The disclaimer is here for the same reason
- * it is in the header -- this must never read as official guidance.
+ * A single compact credit line.
+ *
+ * The long disclaimer and the paragraph of source notes were removed at
+ * the owner's request. What remains is only what the licences actually
+ * oblige: Open-Meteo, PAQI and GeoNames are all CC BY 4.0, which grants
+ * the right to use the data *on condition* that the source is credited,
+ * and the Open-Meteo free tier is non-commercial. Dropping these names
+ * would not be a style choice, it would end the permission the project
+ * relies on, so they are kept -- at one line, in the quietest type on
+ * the page.
  */
-export default function Footer({ modelInfo }) {
+function Credit({ href, children }) {
   return (
-    <footer className="mt-auto border-t border-line bg-canvas/60">
-      <div className="mx-auto max-w-[1800px] px-4 py-5 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-2xl space-y-2">
-            <p className="text-xs leading-relaxed text-fg-subtle">
-              Air-quality and weather data{" "}
-              <a
-                href="https://open-meteo.com"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-accent hover:underline"
-              >
-                &copy; Open-Meteo.com
-              </a>{" "}
-              (CC BY 4.0, non-commercial use). Ground-station observations via{" "}
-              <a
-                href="https://openaq.org"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-accent hover:underline"
-              >
-                OpenAQ
-              </a>{" "}
-              and their underlying providers. Pakistan context data &copy;{" "}
-              <a
-                href="https://pakairquality.hawanama.org"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-accent hover:underline"
-              >
-                PAQI
-              </a>{" "}
-              (CC BY 4.0). City coordinates &copy; GeoNames (CC BY 4.0). Base
-              maps &copy; OpenStreetMap contributors and Esri.
-            </p>
-            {/* The Unsplash License waives attribution, but a photograph
-                carrying the look of the page has earned its credit. */}
-            <p className="text-xs leading-relaxed text-fg-subtle">
-              Category photography by{" "}
-              {photoCredits().map((p, i, all) => (
-                <span key={p.handle}>
-                  <a
-                    href={`https://unsplash.com/@${p.handle}`}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-accent hover:underline"
-                  >
-                    {p.by}
-                  </a>
-                  {i < all.length - 2
-                    ? ", "
-                    : i === all.length - 2
-                      ? " and "
-                      : ""}
-                </span>
-              ))}{" "}
-              on{" "}
-              <a
-                href="https://unsplash.com/license"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-accent hover:underline"
-              >
-                Unsplash
-              </a>
-              .
-            </p>
-            <p className="text-xs leading-relaxed text-fg-faint">
-              Pakistan AirWatch AI is a non-commercial academic MLOps project.
-              It is <strong className="text-fg-subtle">not</strong> an official
-              public-health warning system and does not provide medical advice.
-              Forecast accuracy varies by region: cities without nearby
-              monitoring stations carry greater uncertainty than the map alone
-              can convey.
-            </p>
-          </div>
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="text-fg-subtle transition-colors hover:text-accent hover:underline"
+    >
+      {children}
+    </a>
+  );
+}
 
-          <div className="space-y-2 text-right">
-            {modelInfo?.model_version ? (
-              <div className="font-mono text-2xs leading-relaxed text-fg-faint">
-                <div>
-                  model {modelInfo.algorithm} v{modelInfo.model_version}
-                </div>
-                <div>{modelInfo.n_features} features</div>
-                {modelInfo.metrics?.test_mae ? (
-                  <div>test MAE {modelInfo.metrics.test_mae} ug/m3</div>
-                ) : null}
-              </div>
-            ) : null}
-            <a
-              href="https://github.com/MuhammadHassanSaboor/Pakistan-AirWatch-AI"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 text-xs text-fg-subtle transition-colors hover:text-accent"
-            >
-              <Github size={12} />
-              Source
-              <ExternalLink size={10} />
-            </a>
-          </div>
+export default function Footer({ modelInfo }) {
+  const photographers = photoCredits()
+    .map((p) => p.by)
+    .join(", ");
+
+  return (
+    <footer className="mt-auto border-t border-line">
+      <div
+        className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between
+                   gap-x-6 gap-y-2 px-4 py-3.5 text-2xs text-fg-faint sm:px-6"
+      >
+        <p className="leading-relaxed">
+          Data <Credit href="https://open-meteo.com">Open-Meteo</Credit>,{" "}
+          <Credit href="https://openaq.org">OpenAQ</Credit>,{" "}
+          <Credit href="https://pakairquality.hawanama.org">PAQI</Credit>,
+          GeoNames &middot; CC BY 4.0, non-commercial &middot; maps &copy;
+          OpenStreetMap and Esri &middot; photos{" "}
+          <Credit href="https://unsplash.com/license">{photographers}</Credit>
+        </p>
+
+        <div className="flex items-center gap-4">
+          {modelInfo?.model_version ? (
+            <span className="font-mono">
+              {modelInfo.algorithm} v{modelInfo.model_version}
+              {modelInfo.metrics?.test_mae
+                ? ` · MAE ${modelInfo.metrics.test_mae}`
+                : ""}
+            </span>
+          ) : null}
+          <a
+            href="https://github.com/MuhammadHassanSaboor/Pakistan-AirWatch-AI"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-accent"
+          >
+            <Github size={12} />
+            Source
+            <ExternalLink size={9} />
+          </a>
         </div>
       </div>
     </footer>

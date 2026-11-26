@@ -1,12 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  Activity,
-  CircleAlert,
-  Moon,
-  RefreshCw,
-  Sun,
-  Wind,
-} from "lucide-react";
+import { Activity, Moon, RefreshCw, Sun, Wind } from "lucide-react";
 import clsx from "clsx";
 
 import { EASE } from "./primitives";
@@ -149,20 +142,6 @@ export default function Header({
             />
             <span className="hidden sm:inline">Refresh</span>
           </button>
-        </div>
-      </div>
-
-      {/* The disclaimer is permanent and non-dismissible. This is an
-          academic prototype and must never be mistaken for an official
-          health-warning service. */}
-      <div className="border-t border-warn/15 bg-warn/[0.07]">
-        <div className="mx-auto flex max-w-[1800px] items-center gap-2 px-4 py-1.5 sm:px-6">
-          <CircleAlert size={12} className="shrink-0 text-warn" />
-          <p className="text-xs leading-snug text-warn/85">
-            Academic MLOps prototype. Not an official public-health warning
-            system. Most cities show modelled estimates, not sensor readings
-            &mdash; every value is labelled with its source.
-          </p>
         </div>
       </div>
     </motion.header>
