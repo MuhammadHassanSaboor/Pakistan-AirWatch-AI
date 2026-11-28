@@ -303,6 +303,51 @@ Production, so the Airflow DAG, the Kubeflow pipeline and the CLI all
 pass through the same gate and it cannot be bypassed by using a
 different entry point.
 
+### 5.4 Challenger: residual-target LightGBM + XGBoost blend (Mudassar)
+
+Two changes to *what* is learned, not to the features
+(`src/models/ensemble.py`):
+
+1. **Residual target.** Predict the change from the PM2.5 value
+   observed at *t* rather than the level at *t+h*. The level is mostly
+   "what it is now"; the change is the hard part and is far better
+   centred for trees. The reading at *t* is known at prediction time,
+   so no leakage is introduced (and a zero residual reproduces
+   persistence exactly, which is tested).
+2. **Validation-weighted blend** of a residual LightGBM (127 leaves) and
+   a residual XGBoost (depth 9), both with early stopping. The blend
+   weight is chosen on the **validation** split only; the test split is
+   untouched until the final score.
+
+Head-to-head on **identical data**: the 36 largest cities, same
+100 features, same chronological split, same harness
+(`train_base.py`). Evidence: `reports/head_to_head_36_cities.json`.
+
+| Metric | XGBoost (Hassan's config) | **Residual blend** |
+|---|---|---|
+| **Test MAE** | 11.020 | **10.636** (−3.5%) |
+| Test RMSE | 18.98 | **18.30** |
+| Test R² | 0.800 | **0.814** |
+| MAE +1 h / +6 h | 3.43 / 12.09 | **3.01 / 11.39** |
+| MAE +12 h / +24 h | 13.92 / 14.66 | **13.60 / 14.56** |
+| vs persistence (19.19) | +42.6% | **+44.6%** |
+| Training time | **20 min** | 68 min |
+
+The blend wins on every metric and every horizon; the gain is largest
+at short horizons and shrinks towards +24 h, where weather dominates
+and both models converge. The cost is 3.4× the training time.
+
+Re-scored on the same 1,142,388 test rows by the champion/challenger
+rule (`src/models/champion.py`), the XGBoost model is **rejected** as a
+challenger to the blend (−3.6%; promotion requires ≥ +2%), which is
+the governance working as intended.
+
+*Scope note:* these are 36-city numbers, so they are not directly
+comparable with the 84-city 8.25 in the table above (the largest
+cities are the most polluted, so every model's MAE is higher there).
+Running `--model blend` on the DVC-versioned 84-city dataset is the
+like-for-like confirmation.
+
 ---
 
 ## 6. MLOps
@@ -435,8 +480,36 @@ a running API.
 
 | Tool | Location | Role |
 |---|---|---|
-| Airflow | `pipelines/airflow/dags/` | `hourly_ingest`, `ml_orchestrator`, `retraining` — scheduling, retries, logging |
-| Kubeflow | `pipelines/kubeflow/` | `pipeline_definition.py` → `compiled_pipeline.yaml`; each ML step in its own container |
+| Airflow | `pipelines/airflow/dags/` | `hourly_ingest`, `ml_orchestrator`, `retraining`, **`daily_retrain`** — scheduling, retries, logging |
+| Kubeflow | `pipelines/kubeflow/` | `pipeline_definition.py` → `compiled_pipeline.yaml`; one module per step in `components/`; each ML step in its own container |
+
+**Daily ETL + retraining (`daily_retrain_dag`, 02:00 UTC).**
+`fetch_new_data` (incremental: only days missing from the warehouse)
+→ `validate` (non-retryable) → `load_warehouse` (idempotent UPSERT into
+Postgres) → `build_features` (from the warehouse, not loose files) →
+`train_candidate` → `compare_with_champion` (re-scores champion and
+candidate on the **same** current test split, because the test window
+grows daily) → `promote_candidate` | `keep_champion`. Replaced
+champions are archived; `python -m src.models.champion rollback`
+restores the previous one. Runs in `docker/Dockerfile.airflow`, which
+bakes the dependencies in instead of pip-installing on every start.
+
+**ETL warehouse.** `src/data/load_db.py` loads validated observations
+into a second database (`airwatch`) on the Airflow Postgres server:
+tables `cities`, `observations` (PK `city_id, timestamp`) and
+`etl_runs` (audit). First full load: 1,361,664 rows, 36 cities. The
+load is idempotent and adds new columns automatically; CI runs it
+against a throwaway Postgres service on every push.
+
+**Kubeflow execution.** A full KFP install is several GB of images, so
+the pipeline is executed with the KFP SDK local runner
+(`pipelines/kubeflow/run_local.py`) inside a Linux container
+(`docker/Dockerfile.kfp-local`) — the same component code, typed
+artifacts and hand-offs. The local runner has no `dsl.If`, so each gate
+is a `require` step that fails the run; registration depends on it.
+Verified run (8 cities): 8/8 tasks succeeded, test MAE 13.45 vs
+baseline 22.61 (+40.5%), quality gate passed, model registered to
+Staging.
 
 ### 6.5 Serving
 
@@ -462,7 +535,16 @@ failed".
 
 - `docker/Dockerfile.api`, `docker-compose.yml`
 - `k8s/`: deployment, service, HPA, PodDisruptionBudget, NetworkPolicy,
-  ConfigMap, namespace
+  ConfigMap, namespace; `kubectl apply -k k8s` (base) or
+  `kubectl apply -k k8s-minikube` (local overlay: model mounted from the
+  node, immutable image tag, NodePort 30081)
+- **Demonstrated on minikube (2026-11-28):** 3/3 replicas Ready behind
+  readiness/liveness/startup probes; `/predict` served through the
+  Service; a deleted pod replaced in 3 s and Ready in 15 s; scaled to
+  5/5 and back to 3. Lesson recorded: a node whose disk filled up mid
+  image-import kept a corrupted image (`exec format error`) that
+  re-imports could not replace — a fresh cluster fixed it, and the
+  overlay now pins an immutable tag instead of `:latest`.
 - Prometheus metrics including `airwatch_predicted_pm25_ugm3`, a
   distribution that doubles as an early drift signal
 - Grafana dashboard in `monitoring/grafana/dashboards/airwatch.json`
@@ -573,11 +655,12 @@ Two cartographic decisions worth recording:
 | Model trains via a reproducible pipeline (`dvc repro`) | ✅ 5 stages, `dvc.lock` committed |
 | Data + code versions recoverable | ✅ verified by `scripts/demo_dvc_rollback.sh` |
 | Experiments in MLflow | ✅ shared DagsHub server (**OPEN:** 7 runs, 50+ expected) |
-| Tests run in GitHub Actions | ✅ 262 tests, 72% coverage, gate enforced |
+| Tests run in GitHub Actions | ✅ 283 tests incl. a real Postgres integration test (CI service container), coverage ≥ 70% enforced |
 | A failing quality gate blocks deployment | ✅ `scripts/demo_quality_gate.sh` |
 | Model served by Flask in Docker | ✅ |
-| Kubernetes deployment + scaling | ✅ manifests + HPA (**OPEN:** cluster demo) |
-| Airflow + Kubeflow shown | ✅ DAGs + compiled pipeline |
+| Kubernetes deployment + scaling | ✅ minikube: 3 replicas, probes, pod-kill self-healing, scale 3→5→3 (6.6) |
+| Airflow + Kubeflow shown | ✅ `daily_retrain_dag` ran end to end (8/8 tasks, champion kept); KFP pipeline executed 8/8 tasks (6.4) |
+| ETL into a database | ✅ Postgres warehouse, 1,361,664 rows, idempotent upserts (6.4) |
 | Monitoring, alert, retraining trigger, promotion, rollback | ✅ (**OPEN:** drift threshold defect, 6.7) |
 | **Deployed on a cloud host, serving a real prediction** | ❌ **OPEN** |
 | A stranger can follow the README and reproduce it | ✅ |
@@ -587,7 +670,7 @@ Two cartographic decisions worth recording:
 | # | Item | Owner |
 |---|---|---|
 | 1 | Public deployment. Intended target is **Oracle Cloud Always Free** as an approved equivalent to AWS — needs the teacher's written sign-off first (`SIMPLE_ROADMAP.md` step 17) | all three |
-| 2 | LightGBM / RandomForest runs on the versioned dataset | Mudassar |
+| 2 | ~~LightGBM / RandomForest runs~~ Done on 36 cities as a residual LightGBM + XGBoost blend (5.4); repeat on the 84-city DVC dataset | Mudassar |
 | 3 | Baselines re-run on the versioned dataset | Ifraz |
 | 4 | Fix `retrain_recommended` to threshold on PSI (section 6.7) | Ifraz |
 | 5 | Complete the backfill to all 134 cities (`dvc repro`) | Hassan |
@@ -599,7 +682,7 @@ Two cartographic decisions worth recording:
 | Member | Owns |
 |---|---|
 | **Hassan** | data pipeline, feature engineering, XGBoost, Flask API, React dashboard, DVC + MLflow infrastructure |
-| **Mudassar** | Airflow, Kubeflow, tests, CI/CD, LightGBM / RandomForest / HistGradientBoosting |
+| **Mudassar** | Airflow (incl. daily ETL + retraining DAG), Kubeflow (component modules, local execution), Postgres ETL warehouse, champion/challenger promotion, residual LightGBM + XGBoost blend, Kubernetes minikube deployment, tests, CI/CD |
 | **Ifraz** | Docker, Kubernetes, monitoring, drift detection, baseline models |
 
 All three are expected to be able to explain any part of the system.
