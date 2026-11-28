@@ -1,0 +1,42 @@
+# Keep the build context small and free of secrets. Dockerfiles copy
+# explicit paths, but everything here would otherwise still be sent
+# to the Docker daemon on every build.
+
+# secrets
+.env
+.env.*
+!.env.example
+.dvc/config.local
+
+# environments and caches
+.venv/
+venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage*
+
+# data, models and run outputs (mounted or pulled at runtime)
+data/raw/
+data/interim/
+data/processed/
+models/
+mlruns/
+reports/
+pipelines/airflow/logs/
+feature_store/feature_repo/data/
+.dvc/cache/
+.dvc/tmp/
+
+# tooling and VCS
+.git/
+.github/
+.claude/
+.vscode/
+.idea/
+notebooks/
+frontend/node_modules/
+frontend/dist/

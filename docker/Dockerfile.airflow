@@ -16,13 +16,22 @@ FROM ${BASE}
 
 USER airflow
 
-# Only what the DAG tasks import. pip skips anything the base already has.
-RUN pip install --no-cache-dir \
-        "pandas>=2.1,<2.3" "pyarrow>=16" "numpy==1.26.4" \
-        "scikit-learn==1.5.2" "xgboost>=2.1,<2.2" "lightgbm==4.5.0" \
-        "pandera==0.20.4" "mlflow-skinny==2.17.0" \
-        "tenacity>=8" "python-dotenv>=1" "requests>=2.31" \
-        "SQLAlchemy>=1.4" "psycopg2-binary>=2.9"
+# Only what the DAG tasks import, and only if the base lacks it. Checking
+# by import (not by pip name) matters: a base may ship `xgboost-cpu`,
+# which pip does not recognise as `xgboost` and would replace with the
+# full GPU build (+300 MB of CUDA libraries). We install xgboost-cpu.
+RUN set -e; need=""; \
+    for spec in "pandas:pandas>=2.1,<2.3" "pyarrow:pyarrow>=16" \
+                "sklearn:scikit-learn==1.5.2" "xgboost:xgboost-cpu>=2.1,<2.2" \
+                "lightgbm:lightgbm==4.5.0" "pandera:pandera==0.20.4" \
+                "mlflow:mlflow-skinny==2.17.0" "tenacity:tenacity>=8" \
+                "dotenv:python-dotenv>=1" "requests:requests>=2.31" \
+                "sqlalchemy:SQLAlchemy>=1.4" "psycopg2:psycopg2-binary>=2.9"; do \
+        mod="${spec%%:*}"; pkg="${spec#*:}"; \
+        python -c "import $mod" 2>/dev/null || need="$need $pkg"; \
+    done; \
+    echo "installing:${need:- nothing}"; \
+    if [ -n "$need" ]; then pip install --no-cache-dir $need; fi
 
 # The project targets Python 3.11 and imports `datetime.UTC` (added in
 # 3.11). On a 3.10 base, this one-line .pth file backfills it at
