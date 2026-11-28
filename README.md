@@ -120,6 +120,35 @@ curl localhost:5000/health
 | Grafana | http://localhost:3001 |
 | MLflow (local) | http://localhost:5001 |
 
+### Orchestration, ETL and Kubernetes
+
+```bash
+# Airflow + Postgres warehouse (http://localhost:8080, airflow/airflow)
+docker build -f docker/Dockerfile.airflow -t airwatch-airflow:local .
+# in .env:  AIRFLOW_IMAGE=airwatch-airflow:local  and  AIRFLOW_EXTRA_PIP=
+docker compose -f docker-compose.airflow.yml up airflow-init
+docker compose -f docker-compose.airflow.yml up -d
+
+# ETL: load validated observations into Postgres (host port 5433)
+python -m src.data.load_db             # then: --summary
+# daily retraining: unpause `daily_retrain_dag` in the UI, or
+docker exec airflow-scheduler airflow dags trigger daily_retrain_dag \
+  --conf '{"sample_frac": 0.05}'
+
+# Improved model (residual LightGBM + XGBoost blend) and ranking
+python -m src.models.train_lightgbm --model blend
+python -m src.models.select_model
+python -m src.models.champion status   # promote <dir> | rollback
+
+# Kubeflow pipeline, executed locally inside Linux
+docker build -f docker/Dockerfile.kfp-local -t airwatch-kfp:local .
+docker run --rm -v "$PWD:/work" -w /work -e PYTHONPATH=/work \
+  airwatch-kfp:local python pipelines/kubeflow/run_local.py --max-cities 8
+
+# Kubernetes on minikube (3 replicas, probes, HPA) — see k8s-minikube/
+kubectl apply -k k8s-minikube
+```
+
 ---
 
 ## API

@@ -26,7 +26,10 @@ x-airflow-common: &airflow-common
     PYTHONPATH: /opt/airflow/project
     # Passed through so DAG tasks can reach DagsHub. Empty is fine:
     # the tracking helper falls back to a local store.
-    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+    # Without DagsHub, use a container-only local store: the host's
+    # mlruns/ records Windows artifact paths (E:/...) that do not exist
+    # inside Linux.
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-file:///opt/airflow/project/mlruns_airflow}
     MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
     MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
     AIRWATCH_MEMBER: ${AIRWATCH_MEMBER:-mudassar}

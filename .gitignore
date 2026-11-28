@@ -145,3 +145,4 @@ desktop.ini
 
 # Kubeflow local-runner artifacts
 local_outputs/
+/mlruns_airflow/

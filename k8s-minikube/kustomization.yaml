@@ -19,6 +19,13 @@ kind: Kustomization
 resources:
   - ../k8s
 
+# Pin an immutable tag: re-using :latest lets the node keep serving a
+# stale (or corrupted) copy that `minikube image load` cannot replace
+# while pods still reference it.
+images:
+  - name: airwatch-api
+    newTag: v1-blend
+
 patches:
   # 30080 is commonly taken on a shared dev cluster; use 30081 locally.
   - target:
