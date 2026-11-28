@@ -218,7 +218,7 @@ export function TrendChart({
         hovermode: "x unified",
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
     />
   );
@@ -282,7 +282,7 @@ export function ProvinceChart({ features, height = 280, theme }) {
         bargap: 0.3,
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
     />
   );
@@ -346,7 +346,7 @@ export function TopCitiesChart({
         bargap: 0.3,
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
       onClick={(e) => {
         const id = e?.points?.[0]?.customdata?.[2];
@@ -445,7 +445,7 @@ export function DistributionChart({ features, height = 340, theme }) {
         bargap: 0.3,
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
     />
   );
@@ -556,7 +556,7 @@ export function ExposureChart({ features, height = 330, theme }) {
         yaxis: { ...t.axis, automargin: true },
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
     />
   );
@@ -668,7 +668,7 @@ export function AltitudeProfile({ features, height = 330, theme }) {
         },
       }}
       config={CONFIG}
-      style={{ width: "100%" }}
+      style={{ width: "100%", height }}
       useResizeHandler
     />
   );
