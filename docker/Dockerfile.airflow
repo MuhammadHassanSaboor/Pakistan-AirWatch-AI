@@ -1,0 +1,33 @@
+# Airflow image with the project's training dependencies pre-installed.
+#
+# The stock setup (docker-compose.airflow.yml) installs packages through
+# _PIP_ADDITIONAL_REQUIREMENTS on EVERY container start, which is slow
+# and fails offline. Baking them in once is faster and reproducible.
+#
+#   docker build -f docker/Dockerfile.airflow -t airwatch-airflow:local .
+#   # any Airflow 2.10 image works as the base, e.g. a locally cached one:
+#   docker build -f docker/Dockerfile.airflow \
+#       --build-arg BASE=btc-airflow:2.10.4 -t airwatch-airflow:local .
+#
+# Then set AIRFLOW_IMAGE=airwatch-airflow:local in .env.
+
+ARG BASE=apache/airflow:2.10.2-python3.11
+FROM ${BASE}
+
+USER airflow
+
+# Only what the DAG tasks import. pip skips anything the base already has.
+RUN pip install --no-cache-dir \
+        "pandas>=2.1,<2.3" "pyarrow>=16" "numpy==1.26.4" \
+        "scikit-learn==1.5.2" "xgboost>=2.1,<2.2" "lightgbm==4.5.0" \
+        "pandera==0.20.4" "mlflow-skinny==2.17.0" \
+        "tenacity>=8" "python-dotenv>=1" "requests>=2.31" \
+        "SQLAlchemy>=1.4" "psycopg2-binary>=2.9"
+
+# The project targets Python 3.11 and imports `datetime.UTC` (added in
+# 3.11). On a 3.10 base, this one-line .pth file backfills it at
+# interpreter start-up. It is a no-op on 3.11+.
+RUN SITE=$(python -c "import os, pandas; print(os.path.dirname(os.path.dirname(pandas.__file__)))") \
+ && echo 'import datetime; datetime.UTC = getattr(datetime, "UTC", datetime.timezone.utc)' \
+      > "$SITE/airwatch_py311_compat.pth" \
+ && python -c "from datetime import UTC; print('datetime.UTC OK:', UTC)"
