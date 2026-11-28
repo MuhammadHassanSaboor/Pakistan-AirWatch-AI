@@ -127,3 +127,8 @@ desktop.ini
 .idea/
 *.swp
 *~
+
+# ─────────────────────────────────────────────────────────────
+# Local editor / assistant tooling (per-developer, not the project)
+# ─────────────────────────────────────────────────────────────
+.claude/
