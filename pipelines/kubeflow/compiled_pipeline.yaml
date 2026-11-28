@@ -407,9 +407,9 @@ deploymentSpec:
           \        frames.append(part)\n    out = pd.concat(frames, ignore_index=True).dropna(subset=[\"\
           y\"])\n    out = out.dropna(subset=[\"pm2_5_lag_1h\"])\n\n    # Chronological\
           \ split\n    stamps = pd.to_datetime(out[\"timestamp\"], utc=True)\n   \
-          \ train = out[stamps <= pd.Timestamp(train_end)]\n    val = out[\n     \
-          \   (stamps > pd.Timestamp(train_end)) & (stamps <= pd.Timestamp(val_end))\n\
-          \    ]\n    test = out[stamps > pd.Timestamp(val_end)]\n\n    train.to_parquet(train_set.path,\
+          \ train = out[stamps <= pd.Timestamp(train_end)]\n    val = out[(stamps\
+          \ > pd.Timestamp(train_end)) & (stamps <= pd.Timestamp(val_end))]\n    test\
+          \ = out[stamps > pd.Timestamp(val_end)]\n\n    train.to_parquet(train_set.path,\
           \ index=False)\n    val.to_parquet(val_set.path, index=False)\n    test.to_parquet(test_set.path,\
           \ index=False)\n\n    stats.log_metric(\"train_rows\", float(len(train)))\n\
           \    stats.log_metric(\"val_rows\", float(len(val)))\n    stats.log_metric(\"\
@@ -557,18 +557,19 @@ deploymentSpec:
           \"\"\n    import json\n    import time\n\n    import pandas as pd\n    import\
           \ xgboost as xgb\n    from sklearn.metrics import mean_absolute_error\n\n\
           \    train = pd.read_parquet(train_set.path)\n    val = pd.read_parquet(val_set.path)\n\
-          \n    exclude = {\"y\", \"timestamp\", \"city_id\", \"city_name\", \"province\"\
-          ,\n               \"data_source\", \"ingested_at\", \"valid_time\"}\n  \
-          \  features = [\n        c\n        for c in train.columns\n        if c\
-          \ not in exclude and pd.api.types.is_numeric_dtype(train[c])\n    ]\n\n\
-          \    estimator = xgb.XGBRegressor(\n        objective=\"reg:absoluteerror\"\
-          ,\n        tree_method=\"hist\",\n        max_depth=max_depth,\n       \
-          \ learning_rate=learning_rate,\n        n_estimators=n_estimators,\n   \
-          \     subsample=0.8,\n        colsample_bytree=0.8,\n        early_stopping_rounds=50,\n\
-          \        random_state=42,\n    )\n\n    started = time.time()\n    estimator.fit(\n\
-          \        train[features],\n        train[\"y\"],\n        eval_set=[(val[features],\
-          \ val[\"y\"])],\n        verbose=False,\n    )\n    elapsed = time.time()\
-          \ - started\n\n    val_mae = mean_absolute_error(val[\"y\"], estimator.predict(val[features]))\n\
+          \n    exclude = {\n        \"y\",\n        \"timestamp\",\n        \"city_id\"\
+          ,\n        \"city_name\",\n        \"province\",\n        \"data_source\"\
+          ,\n        \"ingested_at\",\n        \"valid_time\",\n    }\n    features\
+          \ = [\n        c\n        for c in train.columns\n        if c not in exclude\
+          \ and pd.api.types.is_numeric_dtype(train[c])\n    ]\n\n    estimator =\
+          \ xgb.XGBRegressor(\n        objective=\"reg:absoluteerror\",\n        tree_method=\"\
+          hist\",\n        max_depth=max_depth,\n        learning_rate=learning_rate,\n\
+          \        n_estimators=n_estimators,\n        subsample=0.8,\n        colsample_bytree=0.8,\n\
+          \        early_stopping_rounds=50,\n        random_state=42,\n    )\n\n\
+          \    started = time.time()\n    estimator.fit(\n        train[features],\n\
+          \        train[\"y\"],\n        eval_set=[(val[features], val[\"y\"])],\n\
+          \        verbose=False,\n    )\n    elapsed = time.time() - started\n\n\
+          \    val_mae = mean_absolute_error(val[\"y\"], estimator.predict(val[features]))\n\
           \n    estimator.save_model(f\"{model.path}.json\")\n    with open(f\"{model.path}.features.json\"\
           , \"w\") as handle:\n        json.dump(features, handle)\n\n    metrics.log_metric(\"\
           val_mae\", float(val_mae))\n    metrics.log_metric(\"train_seconds\", float(elapsed))\n\
