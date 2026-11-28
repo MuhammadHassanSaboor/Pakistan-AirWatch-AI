@@ -79,6 +79,24 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    # Throwaway Postgres so the ETL warehouse integration test runs for
+    # real (tests/test_champion_etl.py). Exists only for this job.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: airwatch
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: airwatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U airwatch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AIRWATCH_TEST_DATABASE_URL: postgresql://airwatch:ci-only@localhost:5432/airwatch_test
     steps:
       - uses: actions/checkout@v4
 
