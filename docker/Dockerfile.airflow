@@ -26,7 +26,8 @@ RUN set -e; need=""; \
                 "lightgbm:lightgbm==4.5.0" "pandera:pandera==0.20.4" \
                 "mlflow:mlflow-skinny==2.17.0" "tenacity:tenacity>=8" \
                 "dotenv:python-dotenv>=1" "requests:requests>=2.31" \
-                "sqlalchemy:SQLAlchemy>=1.4" "psycopg2:psycopg2-binary>=2.9"; do \
+                "sqlalchemy:SQLAlchemy>=1.4" "psycopg2:psycopg2-binary>=2.9" \
+                "matplotlib:matplotlib>=3.8"; do \
         mod="${spec%%:*}"; pkg="${spec#*:}"; \
         python -c "import $mod" 2>/dev/null || need="$need $pkg"; \
     done; \

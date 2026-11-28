@@ -24,9 +24,12 @@ from airflow.exceptions import AirflowFailException, AirflowSkipException
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+_REPO = Path(__file__).resolve().parents[3]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
+
+# In the Airflow container DAGs live at /opt/airflow/dags but the project
+# is at /opt/airflow/project, so parents[3] of this file would be "/".
 
 DEFAULT_ARGS = {
     "owner": "airwatch-team",
