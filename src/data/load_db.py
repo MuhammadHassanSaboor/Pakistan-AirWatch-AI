@@ -112,7 +112,18 @@ def ensure_schema(engine, columns: list[str] | None = None) -> None:
     with engine.begin() as conn:
         for stmt in DDL:
             conn.execute(text(stmt))
-        conn.execute(text(_obs_ddl(columns or OBS_COLUMNS)))
+        columns = columns or OBS_COLUMNS
+        conn.execute(text(_obs_ddl(columns)))
+        # Schema evolution: CREATE TABLE IF NOT EXISTS never adds columns,
+        # so a variable added to the config later would break the load.
+        for col in columns:
+            if col not in KEY:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE observations ADD COLUMN IF NOT EXISTS "
+                        f"{col} DOUBLE PRECISION"
+                    )
+                )
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_observations_ts "
