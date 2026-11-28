@@ -1,24 +1,30 @@
-"""Execute the Kubeflow pipeline components locally — no cluster required.
+"""Execute the Kubeflow pipeline locally — no Kubeflow cluster required.
 
-A full Kubeflow Pipelines install needs several GB of container images
-and a multi-node-sized cluster. For development and for the course demo
-we use the KFP SDK's local runner, which executes the SAME component
-definitions (pipelines/kubeflow/components/) as subprocesses, with the
-same typed inputs and outputs and the same artifact hand-off between
-steps. The two governance gates of the compiled pipeline are applied
-here as ordinary conditionals:
+A full Kubeflow Pipelines install needs several GB of container images.
+For development and for the course demo we use the KFP SDK's local
+runner, which executes the SAME component definitions
+(pipelines/kubeflow/components/) with the same typed inputs/outputs and
+the same artifact hand-off between steps.
 
-    load_raw -> validate_data --(valid?)--> engineer_features
-             -> train_model -> evaluate_model --(gate?)--> register_model
+The local runner does not support `dsl.If`, so each governance gate is a
+`require` step that FAILS the run when its check fails; every downstream
+step depends on it. Same guarantee as the cluster pipeline: invalid data
+never reaches training and a failing model never reaches registration.
+
+    load_raw -> validate_data -> require(data-valid) -> engineer_features
+      -> train_model -> evaluate_model -> require(quality-gate) -> register_model
+
+Run inside Linux (the runner's `sh -c` launcher breaks on Windows paths):
+
+    docker build -f docker/Dockerfile.kfp-local -t airwatch-kfp:local .
+    docker run --rm -v "$PWD:/work" -w /work -e PYTHONPATH=/work \
+        airwatch-kfp:local python pipelines/kubeflow/run_local.py --max-cities 8
 
 Outputs (datasets, model, metrics) land in ./local_outputs/<run>/.
-
-    python pipelines/kubeflow/run_local.py
-    python pipelines/kubeflow/run_local.py --max-cities 6 --n-estimators 150
 """
 
-from __future__ import annotations
-
+# No `from __future__ import annotations`: KFP reads the component's type
+# annotations at definition time and needs real types, not strings.
 import argparse
 import json
 import sys
@@ -59,8 +65,44 @@ def load_raw(source_path: str, raw: Output[Dataset], max_cities: int = 0):
     print(f"raw: {len(df):,} rows, {df['city_id'].nunique()} cities")
 
 
+@dsl.component(base_image=BASE_IMAGE)
+def require(passed: bool, gate: str):
+    """Fail the run unless `passed`: the local stand-in for `dsl.If`."""
+    if not passed:
+        raise RuntimeError(f"Gate '{gate}' FAILED - downstream steps will not run")
+    print(f"Gate '{gate}' passed")
+
+
+@dsl.pipeline(name="pm25-training-pipeline-local")
+def local_pipeline(
+    source_path: str,
+    max_cities: int = 8,
+    n_estimators: int = 200,
+    mae_threshold: float = 25.0,
+    min_improvement_pct: float = 15.0,
+):
+    raw = load_raw(source_path=source_path, max_cities=max_cities)
+    validation = validate_data(raw_dataset=raw.outputs["raw"], min_rows=1000)
+    data_ok = require(passed=validation.outputs["Output"], gate="data-valid")
+
+    features = engineer_features(raw_dataset=raw.outputs["raw"]).after(data_ok)
+    training = train_model(
+        train_set=features.outputs["train_set"],
+        val_set=features.outputs["val_set"],
+        n_estimators=n_estimators,
+    )
+    evaluation = evaluate_model(
+        model=training.outputs["model"],
+        test_set=features.outputs["test_set"],
+        mae_threshold=mae_threshold,
+        min_improvement_pct=min_improvement_pct,
+    )
+    gate_ok = require(passed=evaluation.outputs["Output"], gate="quality-gate")
+    register_model(model=training.outputs["model"], stage="Staging").after(gate_ok)
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Run the KFP components locally")
+    ap = argparse.ArgumentParser(description="Run the KFP pipeline locally")
     ap.add_argument(
         "--source",
         default=str(PROJECT_ROOT / "data" / "raw" / "airquality_hourly.parquet"),
@@ -78,36 +120,19 @@ def main() -> None:
         runner=local.SubprocessRunner(use_venv=False), pipeline_root=str(run_dir)
     )
 
-    summary: dict = {"run_dir": str(run_dir)}
     t0 = time.time()
-
-    raw = load_raw(source_path=args.source, max_cities=args.max_cities)
-    validation = validate_data(raw_dataset=raw.outputs["raw"], min_rows=1000)
-    summary["data_valid"] = bool(validation.output)
-
-    if not validation.output:
-        summary["stopped_at"] = "validate_data"
-    else:
-        features = engineer_features(raw_dataset=raw.outputs["raw"])
-        training = train_model(
-            train_set=features.outputs["train_set"],
-            val_set=features.outputs["val_set"],
+    summary: dict = {"run_dir": str(run_dir)}
+    try:
+        local_pipeline(
+            source_path=args.source,
+            max_cities=args.max_cities,
             n_estimators=args.n_estimators,
-        )
-        evaluation = evaluate_model(
-            model=training.outputs["model"],
-            test_set=features.outputs["test_set"],
             mae_threshold=args.mae_threshold,
             min_improvement_pct=args.min_improvement_pct,
         )
-        summary["quality_gate_passed"] = bool(evaluation.output)
-        if evaluation.output:
-            register_model(model=training.outputs["model"], stage="Staging")
-            summary["registered"] = True
-        else:
-            summary["stopped_at"] = "evaluate_model"
-            summary["registered"] = False
-
+        summary["status"] = "SUCCEEDED - model registered to Staging"
+    except RuntimeError as exc:
+        summary["status"] = f"STOPPED - {exc}"
     summary["seconds"] = round(time.time() - t0, 1)
     print(json.dumps(summary, indent=2))
 

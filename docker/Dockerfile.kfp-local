@@ -1,0 +1,17 @@
+# Runs the Kubeflow components locally (pipelines/kubeflow/run_local.py)
+# inside Linux, without a Kubeflow cluster.
+#
+# Why a container: the KFP SDK local runner launches each step through
+# `sh -c` with the interpreter path pasted in unquoted, which breaks on
+# Windows paths ("E:\MLOPS project\..."). Inside Linux it works as on a
+# cluster. The API image already pins the exact versions the components
+# declare (pandas 2.2.3, pyarrow 17, scikit-learn 1.5.2, xgboost 2.1.1),
+# so the per-step `pip install` is a no-op and nothing is re-downloaded.
+#
+#   docker build -f docker/Dockerfile.kfp-local -t airwatch-kfp:local .
+#   docker run --rm -v "$PWD:/work" -w /work airwatch-kfp:local \
+#       python pipelines/kubeflow/run_local.py --max-cities 8
+
+FROM airwatch-api:latest
+USER root
+RUN pip install --no-cache-dir kfp==2.9.0
