@@ -60,6 +60,9 @@ COPY --chown=appuser:appuser src/serving/               src/serving/
 # these the registry path raises ImportError inside the container.
 COPY --chown=appuser:appuser src/models/__init__.py     src/models/__init__.py
 COPY --chown=appuser:appuser src/models/tracking.py     src/models/tracking.py
+# Residual / blend model classes: a pickled model of either type can
+# only be unpickled if this module is importable.
+COPY --chown=appuser:appuser src/models/ensemble.py     src/models/ensemble.py
 COPY --chown=appuser:appuser configs/                   configs/
 COPY --chown=appuser:appuser data/reference/            data/reference/
 

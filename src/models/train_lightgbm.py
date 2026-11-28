@@ -12,6 +12,10 @@ Run
     python -m src.models.train_lightgbm
     python -m src.models.train_lightgbm --model random_forest
     python -m src.models.train_lightgbm --sweep
+
+    # improved models (see src/models/ensemble.py)
+    python -m src.models.train_lightgbm --model lgb_residual
+    python -m src.models.train_lightgbm --model blend
 """
 
 from __future__ import annotations
@@ -22,11 +26,13 @@ from itertools import product
 from typing import Any
 
 import lightgbm as lgb
+import xgboost as xgb
 from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 
 from src.config import MODEL_CFG
+from src.models.ensemble import BlendRegressor, ResidualRegressor
 from src.models.train_base import run_training
 
 log = logging.getLogger(__name__)
@@ -72,7 +78,42 @@ def build_hist_gbr(params: dict[str, Any]) -> HistGradientBoostingRegressor:
     )
 
 
+XGB_DEFAULTS = dict(MODEL_CFG["xgboost"])
+ADV = dict(MODEL_CFG.get("mudassar", {}))
+
+
+def _lgb_params(params: dict[str, Any]) -> dict[str, Any]:
+    keys = set(LGB_DEFAULTS) | {"min_split_gain", "subsample_freq", "reg_alpha"}
+    return {k: v for k, v in params.items() if k in keys}
+
+
+def build_lgb_residual(params: dict[str, Any]) -> ResidualRegressor:
+    """LightGBM on the residual target (change from the current reading)."""
+    cfg = {**LGB_DEFAULTS, **ADV.get("lightgbm", {}), **_lgb_params(params)}
+    return ResidualRegressor(lgb.LGBMRegressor(**cfg, verbose=-1))
+
+
+def build_xgb_residual(params: dict[str, Any]) -> ResidualRegressor:
+    """XGBoost on the residual target."""
+    cfg = {**XGB_DEFAULTS, **ADV.get("xgboost", {})}
+    return ResidualRegressor(xgb.XGBRegressor(**cfg))
+
+
+def build_blend(params: dict[str, Any]) -> BlendRegressor:
+    """Residual LightGBM + residual XGBoost, weights tuned on validation."""
+    return BlendRegressor(
+        [
+            ("lgb_residual", build_lgb_residual(params)),
+            ("xgb_residual", build_xgb_residual(params)),
+        ],
+        weight_step=float(ADV.get("blend_weight_step", 0.05)),
+    )
+
+
 BUILDERS = {
+    "lgb_residual": (build_lgb_residual, LGB_DEFAULTS, True),
+    "xgb_residual": (build_xgb_residual, XGB_DEFAULTS, True),
+    "blend": (build_blend, LGB_DEFAULTS, True),
     "lightgbm": (build_lightgbm, LGB_DEFAULTS, False),
     "random_forest": (build_random_forest, RF_DEFAULTS, False),
     "hist_gbr": (
@@ -85,7 +126,9 @@ BUILDERS = {
 
 def _run_one(family: str, params: dict[str, Any], sample_frac: float | None) -> dict:
     builder, _, eval_set = BUILDERS[family]
-    if family == "lightgbm":
+    if family in ("lgb_residual", "xgb_residual", "blend"):
+        name = f"mudassar-{family}"
+    elif family == "lightgbm":
         name = (
             f"lightgbm-leaves{params.get('num_leaves')}"
             f"-lr{params.get('learning_rate')}"
@@ -103,6 +146,7 @@ def _run_one(family: str, params: dict[str, Any], sample_frac: float | None) -> 
         run_name=name,
         supports_eval_set=eval_set,
         sample_frac=sample_frac,
+        metrics_filename=f"train_metrics_{family}.json",
     )
 
 
@@ -161,7 +205,9 @@ def main() -> None:
         sweep(args.sample_frac)
         return
 
-    if args.model == "lightgbm":
+    if args.model in ("lgb_residual", "xgb_residual", "blend"):
+        params = {**LGB_DEFAULTS, **ADV.get("lightgbm", {})}
+    elif args.model == "lightgbm":
         params = {
             **LGB_DEFAULTS,
             "num_leaves": args.num_leaves,

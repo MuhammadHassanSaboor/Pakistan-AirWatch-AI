@@ -78,6 +78,7 @@ def run_training(
     register: bool = True,
     sample_frac: float | None = None,
     save_local: bool = True,
+    metrics_filename: str = "train_metrics.json",
 ) -> dict[str, float]:
     """Train one model, evaluate it and log everything to MLflow."""
     data_path = data_path or DATA_CFG["paths"]["processed"]
@@ -224,7 +225,7 @@ def run_training(
             log.info("Local artifact -> %s", local_dir)
 
         # DVC reads this file for `dvc metrics show` and `metrics diff`.
-        metrics_file = PROJECT_ROOT / "reports" / "train_metrics.json"
+        metrics_file = PROJECT_ROOT / "reports" / metrics_filename
         metrics_file.parent.mkdir(parents=True, exist_ok=True)
         metrics_file.write_text(
             json.dumps(
