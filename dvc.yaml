@@ -85,3 +85,38 @@ stages:
     metrics:
       - reports/train_metrics.json:
           cache: false
+
+  train_blend:
+    desc: Residual LightGBM + XGBoost blend (Mudassar) on the same splits
+    cmd: python -m src.models.train_lightgbm --model blend
+    deps:
+      - src/models/train_lightgbm.py
+      - src/models/ensemble.py
+      - src/models/train_base.py
+      - src/models/evaluate.py
+      - src/features/splits.py
+      - data/processed/features.parquet
+    params:
+      - configs/model_params.yaml:
+          - mudassar
+          - lightgbm
+          - xgboost
+          - split
+          - quality_gate
+    metrics:
+      - reports/train_metrics_blend.json:
+          cache: false
+
+  evaluate:
+    desc: Rank every candidate on test MAE and select the best gated model
+    cmd: python -m src.models.select_model
+    deps:
+      - src/models/select_model.py
+      - reports/train_metrics.json
+      - reports/train_metrics_blend.json
+    params:
+      - configs/model_params.yaml:
+          - metrics
+    metrics:
+      - reports/model_selection.json:
+          cache: false
