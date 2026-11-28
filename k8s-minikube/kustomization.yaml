@@ -20,6 +20,14 @@ resources:
   - ../k8s
 
 patches:
+  # 30080 is commonly taken on a shared dev cluster; use 30081 locally.
+  - target:
+      kind: Service
+      name: airwatch-api-svc
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 30081
   - target:
       kind: Deployment
       name: airwatch-api
