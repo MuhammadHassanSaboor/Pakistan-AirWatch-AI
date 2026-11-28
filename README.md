@@ -5,7 +5,7 @@ end-to-end MLOps system: versioned data, tracked experiments, a quality
 gate that can say *no*, a containerised API, and an interactive
 dashboard.
 
-![tests](https://img.shields.io/badge/tests-127%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-262%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.11-blue)
 ![licence](https://img.shields.io/badge/licence-MIT-informational)
 ![status](https://img.shields.io/badge/status-academic%20prototype-orange)
@@ -59,7 +59,23 @@ pip install -r requirements.txt
 cp .env.example .env            # works as-is; fill in for team features
 ```
 
-### Run it
+### Already on the team? Pull the data instead of re-fetching it
+
+The dataset is versioned with DVC and stored on DagsHub, so you do not
+need to re-download four years of hourly data — and you should not,
+because a fresh fetch gives you a *different* dataset and makes your
+model incomparable with everyone else's. See
+[TEAM_SETUP.md](Documents/TEAM_SETUP.md) for the token setup, then:
+
+```bash
+dvc pull            # ~1.4 GB, byte-identical to what the models trained on
+dvc status          # "Data and pipelines are up to date."
+dvc status -c       # "Cache and remote 'origin' are in sync."
+```
+
+### Run it from scratch
+
+Only needed if you are not using the shared data.
 
 ```bash
 # 1. build the city table
@@ -215,13 +231,19 @@ feature_store/         Feast repo + materialisation demo
 pipelines/
   airflow/dags/        hourly_ingest · ml_orchestrator · retraining
   kubeflow/            pipeline_definition.py → compiled_pipeline.yaml
-tests/                 127 tests across 6 categories
+tests/                 262 tests across 6 categories
 k8s/                   deployment · service · hpa · pdb · networkpolicy
 monitoring/            prometheus.yml · alert_rules.yml · grafana dashboard
 frontend/              React dashboard
 configs/               data_config.yaml · model_params.yaml
-Documents/             planning · workflow · data feasibility · risk · roadmaps
-dvc.yaml               reproducible pipeline
+Documents/             planning · workflow · team setup · feasibility · roadmaps
+notebooks/             EDA · model comparison · drift (committed with outputs)
+scripts/               boundary builder · MLflow run migration · demo shells
+dvc.yaml               pipeline definition: cities → ingest → validate
+                       → features → train
+dvc.lock               the hashes that pin each stage's inputs and outputs
+.dvc/config            DagsHub remote (credentials live in config.local,
+                       which is gitignored)
 ```
 
 ---
@@ -248,7 +270,7 @@ Names only — never commit values. Copy `.env.example` to `.env`.
 ## Testing
 
 ```bash
-pytest -q                                   # 127 tests
+pytest -q                                   # 262 tests, 72% coverage
 pytest --cov=src --cov-report=term-missing
 ```
 
@@ -271,12 +293,60 @@ A leaking model scores brilliantly and forecasts nothing.
 
 | Document | Contents |
 |---|---|
+| [REPORT.md](REPORT.md) | **the project report** — data, features, model, results, MLOps, limitations, status against every acceptance criterion |
 | [PLANNING.md](Documents/PLANNING.md) | scope, decisions, ownership, status |
 | [WORKFLOW.md](Documents/WORKFLOW.md) | daily loop, data flow, model lifecycle, CI |
 | [DATA_FEASIBILITY.md](Documents/DATA_FEASIBILITY.md) | what the APIs actually return, with evidence |
+| [TEAM_SETUP.md](Documents/TEAM_SETUP.md) | **start here if you are Mudassar or Ifraz** — DagsHub token, `dvc pull`, training, troubleshooting |
 | [SIMPLE_ROADMAP.md](Documents/SIMPLE_ROADMAP.md) | plain-language step-by-step guide |
 | [PROJECT_ROADMAP.md](Documents/PROJECT_ROADMAP.md) | detailed reference roadmap |
 | [INSTALL.md](Documents/INSTALL.md) | software and accounts setup |
+
+### Notebooks
+
+Analysis only — all logic lives in `src/`, and the notebooks import it
+rather than reimplementing it. They are committed **with their outputs**,
+so they can be read without being run.
+
+| Notebook | What it establishes |
+|---|---|
+| [01_exploratory_data_analysis.ipynb](notebooks/01_exploratory_data_analysis.ipynb) | coverage, missingness, skew, seasonality, autocorrelation, altitude — each section ends with the modelling decision it justifies |
+| [02_model_comparison.ipynb](notebooks/02_model_comparison.ipynb) | reads the shared MLflow server, checks that runs are comparable *before* ranking them, then builds the per-member leaderboard |
+| [03_drift_and_monitoring.ipynb](notebooks/03_drift_and_monitoring.ipynb) | drift detection against a control window, a real seasonal shift and a simulated smog event — and a measured defect in our own threshold |
+
+```bash
+jupyter lab notebooks/          # or open them in VS Code
+```
+
+### Experiment tracking and data versioning
+
+Both run on one free DagsHub repo — no AWS account, no paid tier.
+
+| | Where |
+|---|---|
+| MLflow UI | [DagsHub → Experiments](https://dagshub.com/MuhammadHassanSaboor/Pakistan-AirWatch-AI/experiments) |
+| Tracking URI | `https://dagshub.com/MuhammadHassanSaboor/Pakistan-AirWatch-AI.mlflow` |
+| DVC remote | `s3://dvc` via the same repo's S3-compatible endpoint |
+| Experiment | `pm25-forecasting` — every member's runs land here |
+
+```bash
+python -m src.models.registry compare            # per-member table
+python -m src.models.registry best               # lowest test MAE
+python scripts/migrate_mlflow_runs.py --dry-run  # move local runs to the server
+```
+
+Three governance demos, each runnable and each verified:
+
+```bash
+./scripts/demo_dvc_rollback.sh    # corrupt the dataset, recover it byte-for-byte
+./scripts/demo_quality_gate.sh    # train a bad model, watch the gate refuse it
+./scripts/rollback.sh             # roll the deployed model back a version
+```
+
+Every run is tagged with `member`, `model_family`, `git_commit` and
+`dataset_version` — the md5 DVC recorded for the feature table it
+trained on. That last tag is what makes "we compared these fairly" a
+checkable claim rather than an assertion.
 
 ---
 
@@ -310,6 +380,41 @@ Stated plainly, because they affect how the numbers should be read.
 5. **Coarse spatial resolution.** A city is one grid extraction. The
    map must not be read as street-level.
 6. **Non-commercial only** while on the free Open-Meteo tier.
+
+### Known issues
+
+Open problems, named rather than left to be discovered.
+
+1. **The drift detector's retrain flag is wired to the wrong number.**
+   `run_drift_check` sets `retrain_recommended` from `drift_share`,
+   which is Evidently's count of statistically significant columns.
+   At our sample sizes (tens of thousands of rows per window) a
+   Kolmogorov–Smirnov test rejects the null on differences far too
+   small to matter, so that share saturates at 100% and the flag is
+   effectively always `True` — it fires even on a control window of two
+   adjacent weeks. The PSI values the same function computes *are*
+   sound and do separate the cases cleanly (control 1/8 features above
+   0.25, seasonal shift 2/8, simulated smog event 6/8), so the fix is
+   to threshold on PSI. Measured in
+   [03_drift_and_monitoring.ipynb](notebooks/03_drift_and_monitoring.ipynb).
+   Owner: Ifraz.
+2. **The model comparison is currently one family deep.** XGBoost and
+   the reference baselines are logged; LightGBM, RandomForest and the
+   remaining baselines are not yet run on the versioned dataset, so the
+   per-member table has rows for one member. The infrastructure is in
+   place and shared — see [TEAM_SETUP.md](Documents/TEAM_SETUP.md).
+   Owners: Mudassar, Ifraz.
+3. **Two historical runs are not comparable with the current ones.**
+   They predate DVC tracking and were trained on a superseded feature
+   table; they carry `dataset_provenance: pre-dvc-tracking` and a
+   different `dataset_cohort` on the MLflow server. They are kept
+   rather than deleted because the discrepancy is the clearest
+   available demonstration of why the dataset needed versioning at all.
+4. **Not deployed publicly yet.** The API is containerised with
+   Kubernetes manifests, an HPA and a NetworkPolicy, and runs locally;
+   no cloud resource exists. The intended target is Oracle Cloud Always
+   Free as an approved equivalent to AWS, which needs the teacher's
+   written sign-off first (`SIMPLE_ROADMAP.md`, step 17).
 
 ---
 

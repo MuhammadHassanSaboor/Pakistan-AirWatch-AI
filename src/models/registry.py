@@ -29,6 +29,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import joblib
 import mlflow
 import pandas as pd
 from mlflow.tracking import MlflowClient
@@ -158,7 +159,10 @@ def promote(run_id: str, stage: str = STAGING) -> int:
     """Move the version produced by `run_id` to `stage`."""
     version = _version_for_run(run_id)
     c = client()
-    c.transition_model_version_stage(MODEL_NAME, version, stage)
+    # Every registry call takes the version as a string: the REST store
+    # serialises it into a protobuf string field. See the note in
+    # promote_to_production().
+    c.transition_model_version_stage(MODEL_NAME, str(version), stage)
     log.info("Model %s v%d -> %s", MODEL_NAME, version, stage)
     return version
 
@@ -185,11 +189,19 @@ def promote_to_production(version: int, approved_by: str = "team-review") -> int
         )
 
     c.transition_model_version_stage(
-        MODEL_NAME, version, PRODUCTION, archive_existing_versions=True
+        MODEL_NAME, str(version), PRODUCTION, archive_existing_versions=True
     )
-    c.set_model_version_tag(MODEL_NAME, version, "approved_by", approved_by)
+    # str(version), not version. MLflow's REST store puts this straight
+    # into a protobuf whose `version` field is a string, and an int
+    # raises "TypeError: bad argument type for built-in operation" from
+    # inside protobuf -- after the stage transition has already
+    # succeeded. The model went to Production with no record of who
+    # approved it, which is the one thing these two tags exist to
+    # prevent. Our tests did not catch it because they stub the MLflow
+    # client, and a stub does not enforce protobuf field types.
+    c.set_model_version_tag(MODEL_NAME, str(version), "approved_by", approved_by)
     c.set_model_version_tag(
-        MODEL_NAME, version, "promoted_at", pd.Timestamp.now(tz="UTC").isoformat()
+        MODEL_NAME, str(version), "promoted_at", pd.Timestamp.now(tz="UTC").isoformat()
     )
     log.info(
         "Model %s v%d -> %s (approved by %s)",
@@ -227,6 +239,136 @@ def rollback() -> int:
 # ──────────────────────────────────────────────────────────────
 # Local export (so the API can run without network access)
 # ──────────────────────────────────────────────────────────────
+def _candidate_meta_for(run_id: str) -> tuple[Path, dict[str, Any]] | None:
+    """Find the candidate directory produced by `run_id`.
+
+    Matched on run_id and never on directory name: run names repeat
+    (they are built from hyperparameters), so matching on the name
+    would eventually pair a version with another run's weights.
+    """
+    candidates = PROJECT_ROOT / "models" / "candidates"
+    if not candidates.is_dir():
+        return None
+    for meta_file in sorted(candidates.glob("*/metadata.json")):
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if meta.get("run_id") == run_id:
+            return meta_file, meta
+    return None
+
+
+def _feature_names_for(run_id: str) -> list[str]:
+    """The feature list, in training order, for the exported version.
+
+    Not cosmetic. `ModelLoader.predict` uses this list to check for
+    missing columns and to reorder the frame before calling the model.
+    When it is empty that check is skipped entirely -- and a
+    gradient-boosted model consumes columns positionally, so a frame
+    assembled in a different order would produce confident nonsense
+    rather than an error. The exported metadata therefore has to carry
+    it; dropping it silently removed the guard.
+    """
+    found = _candidate_meta_for(run_id)
+    if found is not None:
+        names = found[1].get("feature_names") or []
+        if names:
+            return [str(n) for n in names]
+    try:
+        art = mlflow.artifacts.load_dict(f"runs:/{run_id}/feature_names.json")
+        return [str(n) for n in (art.get("feature_names") or [])]
+    except Exception:
+        log.warning(
+            "No feature_names found for run %s; ModelLoader will not be able "
+            "to verify column order.",
+            run_id[:8],
+        )
+        return []
+
+
+#: MLflow flavour -> module exposing load_model, in preference order.
+_FLAVOURS = {
+    "xgboost": "mlflow.xgboost",
+    "lightgbm": "mlflow.lightgbm",
+    "sklearn": "mlflow.sklearn",
+}
+
+
+def _pickle_from_registry(pickle: Path, family: str) -> bool:
+    """Load the Production model and write it as a pickle.
+
+    Tries the flavour matching `family` first, then the others, so this
+    keeps working when Mudassar's LightGBM models reach production.
+    Returns True if a pickle was written.
+    """
+    order = [family] if family in _FLAVOURS else []
+    order += [f for f in _FLAVOURS if f not in order]
+    for flavour in order:
+        try:
+            module = __import__(_FLAVOURS[flavour], fromlist=["load_model"])
+            model = module.load_model(f"models:/{MODEL_NAME}/{PRODUCTION}")
+        except Exception:
+            continue
+        joblib.dump(model, pickle)
+        log.info("Rebuilt model.pkl from the %s flavour", flavour)
+        return True
+    return False
+
+
+def _sync_pickle(dest: Path, run_id: str, run, *, from_export: bool) -> None:
+    """Make sure `model.pkl` in `dest` belongs to the exported version.
+
+    MLflow stores an XGBoost model as `model.xgb` next to an `MLmodel`
+    file; it never writes `model.pkl`. But the offline serving path
+    (`ModelLoader._load_from_disk`) loads `model.pkl` and nothing else.
+
+    So an export used to copy the new weights in as `model.xgb`,
+    overwrite `metadata.json` with the new version's provenance, and
+    leave whatever `model.pkl` happened to be there from a previous
+    export untouched. The API then reported the new version through
+    `/model-info` while predicting with the old weights -- the one
+    claim a model registry exists to make, quietly false.
+
+    Preference order: a pickle the registry itself carried, then the
+    candidate directory saved by the run that produced this version,
+    then re-serialising the MLflow artefact. If none of those can be
+    had, the stale pickle is deleted rather than left to be served,
+    because failing to start is better than serving the wrong model.
+    """
+    pickle = dest / "model.pkl"
+
+    # 1. The registry artefacts themselves carried a pickle, so the
+    #    file now on disk is this version's by construction.
+    if from_export and pickle.exists():
+        return
+
+    # 2. The candidate directory written by the training run itself.
+    found = _candidate_meta_for(run_id)
+    if found is not None:
+        meta_file, _meta = found
+        source = meta_file.parent / "model.pkl"
+        if source.exists():
+            shutil.copy2(source, pickle)
+            log.info("Synced model.pkl from candidate %s", meta_file.parent.name)
+            return
+
+    # 3. Re-serialise the MLflow artefact.
+    family = (run.data.tags.get("model_family") or "").lower()
+    if _pickle_from_registry(pickle, family):
+        return
+
+    # 4. Nothing trustworthy is available.
+    if pickle.exists():
+        pickle.unlink()
+        log.error(
+            "Could not produce a model.pkl for version %s; removed the stale "
+            "one rather than let the API serve weights that do not match "
+            "metadata.json. Copy it from models/candidates/<run>/model.pkl.",
+            run_id[:8],
+        )
+
+
 def export_production(dest: str | Path | None = None) -> Path:
     """Copy the Production model to models/production/ for offline serving."""
     dest = Path(dest or PROJECT_ROOT / "models" / "production")
@@ -240,15 +382,19 @@ def export_production(dest: str | Path | None = None) -> Path:
     log.info("Downloading %s ...", uri)
 
     tmp = mlflow.artifacts.download_artifacts(artifact_uri=uri)
+    exported_pickle = False
     for item in Path(tmp).iterdir():
         target = dest / item.name
         if item.is_dir():
             shutil.copytree(item, target, dirs_exist_ok=True)
         else:
             shutil.copy2(item, target)
+        exported_pickle = exported_pickle or item.name == "model.pkl"
 
     c = client()
     run = c.get_run(prod["run_id"])
+
+    _sync_pickle(dest, prod["run_id"], run, from_export=exported_pickle)
     (dest / "metadata.json").write_text(
         json.dumps(
             {
@@ -256,8 +402,14 @@ def export_production(dest: str | Path | None = None) -> Path:
                 "version": prod["version"],
                 "stage": PRODUCTION,
                 "run_id": prod["run_id"],
+                "run_name": run.data.tags.get("mlflow.runName"),
+                "model_family": run.data.tags.get("model_family"),
+                "member": run.data.tags.get("member"),
+                "dataset_version": run.data.tags.get("dataset_version"),
                 "metrics": dict(run.data.metrics),
                 "tags": dict(run.data.tags),
+                # Required by ModelLoader to validate and order columns.
+                "feature_names": _feature_names_for(prod["run_id"]),
                 "exported_at": pd.Timestamp.now(tz="UTC").isoformat(),
             },
             indent=2,

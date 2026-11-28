@@ -63,20 +63,68 @@ def dataset_version(path: str | Path) -> str:
     """MD5 recorded by DVC for a tracked dataset.
 
     Links each MLflow run to the exact bytes it trained on, which is
-    what makes "reproduce run 42" a real operation.
+    what makes "reproduce run 42" a real operation, and what lets three
+    people confirm they compared models on identical data rather than
+    on three different downloads of a rolling API.
+
+    Two layouts have to be read, because DVC records hashes in two
+    different places:
+
+      * ``dvc.lock`` -- for files produced by a *pipeline* stage, which
+        is every dataset in this project. The hash lives under
+        ``stages.<name>.outs[].md5``.
+      * ``<path>.dvc`` -- the sidecar written by a bare ``dvc add``.
+
+    Only the sidecar was checked before, so every pipeline output
+    looked untracked and every run was tagged ``dataset_version:
+    untracked`` -- the one tag that makes a comparison table
+    trustworthy, silently absent.
+
+    Separators are normalised by string replacement rather than by
+    ``Path.as_posix()``, which is **platform dependent**: on Windows
+    ``Path(r"data\\x.parquet").as_posix()`` yields ``data/x.parquet``,
+    but on Linux a backslash is an ordinary filename character, so the
+    same call returns it unchanged and the lookup silently misses.
+    Doing it as a plain string makes the result identical everywhere.
+    (This is not hypothetical: it passed locally on Windows and failed
+    on the Linux CI runner.)
     """
-    dvc_file = Path(f"{path}.dvc")
-    if not dvc_file.is_absolute():
-        dvc_file = PROJECT_ROOT / dvc_file
-    if not dvc_file.exists():
-        return "untracked"
-    try:
-        for line in dvc_file.read_text(encoding="utf-8").splitlines():
-            if "md5:" in line:
-                return line.split("md5:")[1].strip()
-    except Exception:
-        pass
-    return "unknown"
+    # Normalise first, so the separator style cannot depend on the OS.
+    wanted = str(path).replace("\\", "/")
+
+    root = PROJECT_ROOT.as_posix().replace("\\", "/").rstrip("/")
+    if wanted.startswith(f"{root}/"):
+        wanted = wanted[len(root) + 1 :]
+    # A path from outside the repo stays absolute; it simply will not
+    # match anything in dvc.lock, which is the correct answer.
+    wanted = wanted.removeprefix("./")
+
+    lock = PROJECT_ROOT / "dvc.lock"
+    if lock.exists():
+        try:
+            import yaml
+
+            doc = yaml.safe_load(lock.read_text(encoding="utf-8")) or {}
+            for stage in (doc.get("stages") or {}).values():
+                for out in stage.get("outs") or []:
+                    if out.get("path") == wanted and out.get("md5"):
+                        return str(out["md5"])
+        except Exception:
+            log.debug("Could not read dvc.lock for %s", wanted, exc_info=True)
+
+    sidecar = PROJECT_ROOT / f"{wanted}.dvc"
+    if sidecar.exists():
+        try:
+            import yaml
+
+            doc = yaml.safe_load(sidecar.read_text(encoding="utf-8")) or {}
+            for out in doc.get("outs") or []:
+                if out.get("md5"):
+                    return str(out["md5"])
+        except Exception:
+            log.debug("Could not read %s", sidecar, exc_info=True)
+
+    return "untracked"
 
 
 def configure() -> bool:

@@ -47,6 +47,136 @@ def test_dataset_version_reports_untracked_data(tmp_path):
     assert tracking.dataset_version(tmp_path / "nothing.parquet") == "untracked"
 
 
+# Datasets produced by a DVC *pipeline* stage have no `.dvc` sidecar --
+# their hashes live in dvc.lock. Only the sidecar was read for a while,
+# so every pipeline output looked untracked and every MLflow run was
+# tagged `dataset_version: untracked`, which is precisely the tag that
+# makes a three-member comparison table trustworthy.
+LOCK = """\
+schema: '2.0'
+stages:
+  features:
+    cmd: python -m src.features.build_features
+    deps:
+    - path: data/raw/airquality_hourly.parquet
+      md5: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    outs:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: b3dce04aad6b7bb9d829a9ffd94edce2
+      size: 1324635702
+    - path: reports/feature_summary.json
+      hash: md5
+      md5: e4452bc2497e3f16ff742f958a2209b6
+"""
+
+
+def test_dataset_version_reads_the_dvc_lock_for_pipeline_outputs(monkeypatch, tmp_path):
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert (
+        tracking.dataset_version("data/processed/features.parquet")
+        == "b3dce04aad6b7bb9d829a9ffd94edce2"
+    )
+
+
+def test_dataset_version_matches_the_right_output_in_a_multi_output_stage(
+    monkeypatch, tmp_path
+):
+    """A stage with several outs must not return the first hash blindly."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert (
+        tracking.dataset_version("reports/feature_summary.json")
+        == "e4452bc2497e3f16ff742f958a2209b6"
+    )
+
+
+def test_dataset_version_does_not_match_a_dependency(monkeypatch, tmp_path):
+    """Only `outs` identify what a stage produced; deps belong to others."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    # The raw file is a dep of `features` but the out of `ingest`, which
+    # this cut-down lock omits -- so it is genuinely not recorded here.
+    assert tracking.dataset_version("data/raw/airquality_hourly.parquet") == "untracked"
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        "data/processed/features.parquet",
+        r"data\processed\features.parquet",
+        "./data/processed/features.parquet",
+    ],
+)
+def test_dataset_version_normalises_separators_on_every_platform(
+    monkeypatch, tmp_path, given
+):
+    """Same answer for every spelling, on Windows and on Linux alike.
+
+    DVC always writes POSIX paths into dvc.lock. Normalising the lookup
+    key with `Path.as_posix()` looks right and is a trap: it is
+    platform dependent. On Windows a backslash is a separator so it
+    converts, but on Linux a backslash is an ordinary filename
+    character, so the key keeps its backslashes, never matches, and the
+    dataset silently reports as `untracked` -- losing the provenance
+    tag precisely where nobody is watching.
+
+    This is the bug that passed locally and failed on the Linux CI
+    runner, so the spellings are parametrised rather than trusted.
+    """
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert tracking.dataset_version(given) == "b3dce04aad6b7bb9d829a9ffd94edce2"
+
+
+def test_as_posix_is_the_wrong_tool_for_this(monkeypatch, tmp_path):
+    """Pin down *why* the normalisation is done with str.replace.
+
+    Asserts the platform difference directly, so nobody "simplifies"
+    the implementation back to `Path(path).as_posix()` and reintroduces
+    a failure that only shows up on Linux.
+    """
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    windows_style = r"data\processed\features.parquet"
+    expected = "data/processed/features.parquet"
+
+    # The trap: identical call, different answers per platform.
+    assert PureWindowsPath(windows_style).as_posix() == expected
+    assert PurePosixPath(windows_style).as_posix() != expected
+
+    # Plain string replacement agrees with the POSIX form everywhere.
+    assert windows_style.replace("\\", "/") == expected
+
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert tracking.dataset_version(windows_style) == tracking.dataset_version(expected)
+
+
+def test_dataset_version_survives_a_malformed_lock(monkeypatch, tmp_path):
+    """A broken lock must not crash a training run that is otherwise fine."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(": not: valid: yaml: [", encoding="utf-8")
+    assert tracking.dataset_version("data/processed/features.parquet") == "untracked"
+
+
+def test_the_real_feature_table_is_dvc_tracked():
+    """Regression guard on the committed repo, not on a fixture.
+
+    This is the assertion that would have caught the whole problem:
+    the project's own feature table must resolve to a real md5, so no
+    run can be logged against an unidentified dataset again.
+    """
+    version = tracking.dataset_version("data/processed/features.parquet")
+    assert version != "untracked", (
+        "data/processed/features.parquet is not recorded in dvc.lock -- "
+        "run `dvc commit` (or `dvc repro`) and commit dvc.lock"
+    )
+    assert len(version) == 32, f"expected an md5, got {version!r}"
+    int(version, 16)  # raises unless it is hexadecimal
+
+
 def test_standard_tags_include_everything_the_comparison_needs(tmp_path):
     tags = tracking.standard_tags("xgboost", tmp_path / "x.parquet")
     for key in (
@@ -218,11 +348,18 @@ class _Client:
     def get_run(self, run_id):
         return _Run(self._metrics.get(run_id, {}))
 
+    # Both of these record the version EXACTLY as it was passed. They
+    # used to coerce it with str(), which quietly made the stub more
+    # forgiving than the real REST store -- an int version sails
+    # through here but raises inside protobuf against a live server.
+    # That difference hid a real bug that put a model into Production
+    # with no `approved_by` tag, so the stub now preserves the type and
+    # the tests assert on it.
     def transition_model_version_stage(self, name, version, stage, **kwargs):
-        self.transitions.append((name, str(version), stage, kwargs))
+        self.transitions.append((name, version, stage, kwargs))
 
     def set_model_version_tag(self, _name, version, key, value):
-        self.tags.append((str(version), key, value))
+        self.tags.append((version, key, value))
 
 
 def _install_client(monkeypatch, client):
@@ -309,6 +446,127 @@ def test_promotion_records_who_approved_it(monkeypatch):
     keys = {key: value for _v, key, value in client.tags}
     assert keys["approved_by"] == "hassan"
     assert "promoted_at" in keys
+
+
+def test_registry_calls_pass_the_version_as_a_string(monkeypatch):
+    """Regression guard: MLflow's REST store needs a string version.
+
+    An int reaches a protobuf string field and raises "bad argument
+    type for built-in operation" from inside protobuf -- but only
+    against a real server, and only *after* the stage transition has
+    already gone through. That left a model in Production with no
+    `approved_by` tag: the audit trail silently missing on the one
+    operation that most needs it.
+
+    These tests stub the MLflow client, and a stub happily accepts an
+    int, which is exactly why the original bug survived a green suite.
+    So assert the type we send rather than trusting the stub.
+    """
+    client = _Client(
+        [_Version(8, "Staging", "good")],
+        {"good": {"test_mae": 8.0, "improvement_pct": 42.0}},
+    )
+    _install_client(monkeypatch, client)
+    monkeypatch.setattr(registry, "production_metrics", dict)
+
+    registry.promote_to_production(8, approved_by="hassan")
+
+    assert client.tags, "no version tags were set at all"
+    for version, key, _value in client.tags:
+        assert isinstance(version, str), (
+            f"set_model_version_tag got {type(version).__name__} for {key!r}; "
+            "MLflow's REST store requires a string version"
+        )
+    assert client.transitions, "no stage transition was requested"
+    for _name, version, _stage, _kwargs in client.transitions:
+        assert isinstance(version, str), (
+            "transition_model_version_stage got "
+            f"{type(version).__name__}; it must be a string"
+        )
+
+
+# ──────────────────────────────────────────────────────────────
+# Local export: the served weights must match the served provenance
+# ──────────────────────────────────────────────────────────────
+class _Tags:
+    def __init__(self, tags):
+        self.tags = tags
+
+
+class _TaggedRun:
+    """Just enough of an MLflow Run to carry tags."""
+
+    def __init__(self, **tags):
+        self.data = _Tags(tags)
+
+
+def _candidate(root, name, run_id, payload=b"new-weights"):
+    d = root / "models" / "candidates" / name
+    d.mkdir(parents=True)
+    (d / "metadata.json").write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    (d / "model.pkl").write_bytes(payload)
+    return d
+
+
+def test_export_syncs_the_pickle_from_the_matching_candidate(monkeypatch, tmp_path):
+    """The crux: MLflow writes model.xgb, the loader reads model.pkl.
+
+    Without this sync an export leaves the previous version's
+    model.pkl in place while replacing metadata.json, so /model-info
+    advertises the new model and the API serves the old weights.
+    """
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    _candidate(tmp_path, "xgboost-run-b", "run-b", b"weights-for-run-b")
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"weights-for-run-a")  # stale
+
+    registry._sync_pickle(
+        dest, "run-b", _TaggedRun(model_family="xgboost"), from_export=False
+    )
+    assert (dest / "model.pkl").read_bytes() == b"weights-for-run-b"
+
+
+def test_export_never_takes_a_candidate_from_a_different_run(monkeypatch, tmp_path):
+    """Matched on run_id, not on directory name."""
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    _candidate(tmp_path, "xgboost-run-a", "run-a", b"weights-for-run-a")
+    monkeypatch.setattr(registry, "_pickle_from_registry", lambda *a, **k: False)
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"weights-for-run-a")
+
+    registry._sync_pickle(
+        dest, "run-b", _TaggedRun(model_family="xgboost"), from_export=False
+    )
+    # run-a's weights are not run-b's, so nothing may be served.
+    assert not (dest / "model.pkl").exists()
+
+
+def test_export_deletes_a_stale_pickle_it_cannot_replace(monkeypatch, tmp_path):
+    """Refusing to start beats serving weights that are not the ones
+    metadata.json claims."""
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(registry, "_pickle_from_registry", lambda *a, **k: False)
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"stale")
+
+    registry._sync_pickle(dest, "run-x", _TaggedRun(), from_export=False)
+    assert not (dest / "model.pkl").exists()
+
+
+def test_export_keeps_a_pickle_the_registry_itself_provided(monkeypatch, tmp_path):
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"from-registry")
+
+    registry._sync_pickle(dest, "run-y", _TaggedRun(), from_export=True)
+    assert (dest / "model.pkl").read_bytes() == b"from-registry"
 
 
 def test_rollback_restores_the_most_recent_archived_version(monkeypatch):
