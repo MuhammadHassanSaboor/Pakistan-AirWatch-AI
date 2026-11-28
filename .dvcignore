@@ -1,3 +1,30 @@
-# Add patterns of files dvc should ignore, which could improve
-# the performance. Learn more at
-# https://dvc.org/doc/user-guide/dvcignore
+# Paths DVC never needs to look at.
+#
+# DVC walks the workspace to decide what changed. Without this it also
+# walks node_modules, which is tens of thousands of files that can
+# never be a pipeline dependency, and every dvc command pays for it.
+
+# ── Frontend ──────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Python ────────────────────────────────────────────────────
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Local experiment output ───────────────────────────────────
+# mlruns/ is the fallback store used when no MLflow credentials are
+# set; the shared server is the real record, so it is not versioned.
+mlruns/
+models/candidates/
+
+# ── Scratch ───────────────────────────────────────────────────
+reports/drift_notebook/
+reports/drift_simulation/
+*.log
+.ipynb_checkpoints/

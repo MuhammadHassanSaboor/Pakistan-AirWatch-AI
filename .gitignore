@@ -91,6 +91,16 @@ reports/*
 !reports/.gitkeep
 !reports/*.md
 
+# The three files dvc.yaml declares as `metrics: cache: false` are a
+# deliberate exception. `cache: false` means DVC does NOT store them --
+# it expects Git to, which is what makes `dvc metrics diff <rev>` able
+# to compare a run against an earlier commit. Ignoring them left the
+# metrics out of history entirely and that command with nothing to read.
+# They are small, plain JSON, and contain no credentials.
+!reports/data_quality.json
+!reports/feature_summary.json
+!reports/train_metrics.json
+
 # ─────────────────────────────────────────────────────────────
 # Feature store (generated state)
 # ─────────────────────────────────────────────────────────────

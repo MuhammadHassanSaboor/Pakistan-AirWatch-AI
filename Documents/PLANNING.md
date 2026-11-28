@@ -215,7 +215,7 @@ environment + repo + DVC/DagsHub
 | React dashboard | ✅ | builds and runs |
 | Prometheus + Grafana | ✅ | 11-panel dashboard, 7 alert rules |
 | Deployment | ⏸ deferred | by request |
-| Final report | ⏳ | `REPORT.md` |
+| Final report | ✅ | [`REPORT.md`](../REPORT.md) — open items listed in its section 9 |
 
 ---
 

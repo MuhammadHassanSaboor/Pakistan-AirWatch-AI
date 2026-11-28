@@ -88,7 +88,12 @@ xgboost:
   tree_method: hist
   max_depth: 8
   learning_rate: 0.05
-  n_estimators: 600
+  # 400, not 600: this is what the model currently in
+  # models/production/ was actually trained with. `dvc repro` has to
+  # rebuild the artefact that is being served, so the config has to
+  # state the deployed value rather than an aspirational one. Early
+  # stopping (50 rounds) means this is an upper bound anyway.
+  n_estimators: 400
   subsample: 0.8
   colsample_bytree: 0.8
   min_child_weight: 5
