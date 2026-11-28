@@ -105,8 +105,9 @@ def pm25_pipeline(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compile the Kubeflow pipeline")
-    parser.add_argument("--submit", action="store_true",
-                        help="submit a run after compiling")
+    parser.add_argument(
+        "--submit", action="store_true", help="submit a run after compiling"
+    )
     parser.add_argument("--host", default="http://localhost:8080")
     parser.add_argument("--raw-uri", default="gs://airwatch/airquality_hourly.parquet")
     args = parser.parse_args()
