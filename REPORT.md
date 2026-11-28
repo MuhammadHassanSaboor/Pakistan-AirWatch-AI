@@ -250,7 +250,7 @@ Source: `reports/train_metrics.json` and
 | Validation MAE | 7.57 |
 | Persistence baseline MAE | 14.04 |
 | **Improvement over baseline** | **+41.3%** |
-| Training time | ≈28 min (laptop CPU) |
+| Training time | 2181 s (36 min, laptop CPU) |
 
 ### 5.1 Error grows with horizon
 
@@ -388,6 +388,45 @@ registered at all. Promotion to Production records `approved_by` and
 `promoted_at` as version tags, so the audit trail answers "who
 deployed this, and when".
 
+Current state, verified against the live server:
+
+| | |
+|---|---|
+| Version | **1** |
+| Stage | **Production** |
+| Run | `49cf5b28` |
+| `approved_by` | `hassan` |
+| `dataset_version` | `b3dce04aad6b7bb9d829a9ffd94edce2` |
+| Served by the API | `/model-info` reports v1 / Production / `49cf5b28`, 100 features |
+
+**Two defects this promotion exposed, both fixed.** Worth recording
+because both were invisible to a passing test suite:
+
+1. `set_model_version_tag` was called with an *int* version. MLflow's
+   REST store puts it into a protobuf string field, which raises
+   `TypeError: bad argument type for built-in operation` -- but only
+   against a real server, and only *after* the stage transition had
+   already succeeded. The model reached Production with **no
+   `approved_by` tag**: the governance record silently missing on the
+   one operation that most needs it. Our tests stub the MLflow client
+   and the stub coerced the version with `str()`, so it was strictly
+   more forgiving than the real thing. The stub now preserves the type
+   and a test asserts it.
+2. `export_production` copied the registry artefacts (`model.xgb`,
+   `MLmodel`) and rewrote `metadata.json`, but the offline serving path
+   loads `model.pkl` -- which MLflow never writes. An export therefore
+   left the *previous* version's `model.pkl` in place beside the new
+   version's metadata, so `/model-info` advertised the new model while
+   predictions came from the old weights. The exported metadata also
+   dropped `feature_names`, which `ModelLoader.predict` uses to check
+   and reorder columns; without it that guard is skipped, and a
+   gradient-boosted model consumes columns positionally, so a
+   differently-ordered frame would yield confident nonsense rather than
+   an error. Export now syncs the pickle from the candidate matching
+   the version's `run_id`, carries `feature_names`, and deletes a stale
+   pickle it cannot replace rather than letting it be served. Four
+   tests cover it.
+
 `registry.rollback()` returns the most recently archived version to
 Production in seconds; `./scripts/rollback.sh` demonstrates it against
 a running API.
@@ -458,8 +497,8 @@ side effect of writing a report.
 
 | | |
 |---|---|
-| Tests | **254 passing** |
-| Coverage | **72.24%** (gate: 70%) |
+| Tests | **259 passing** |
+| Coverage | **71.68%** (gate: 70%) |
 | CI | `.github/workflows/ci.yml` |
 
 CI runs `ruff check src tests pipelines`, `ruff format --check`,
@@ -534,7 +573,7 @@ Two cartographic decisions worth recording:
 | Model trains via a reproducible pipeline (`dvc repro`) | ✅ 5 stages, `dvc.lock` committed |
 | Data + code versions recoverable | ✅ verified by `scripts/demo_dvc_rollback.sh` |
 | Experiments in MLflow | ✅ shared DagsHub server (**OPEN:** 7 runs, 50+ expected) |
-| Tests run in GitHub Actions | ✅ 254 tests, 72% coverage, gate enforced |
+| Tests run in GitHub Actions | ✅ 259 tests, 72% coverage, gate enforced |
 | A failing quality gate blocks deployment | ✅ `scripts/demo_quality_gate.sh` |
 | Model served by Flask in Docker | ✅ |
 | Kubernetes deployment + scaling | ✅ manifests + HPA (**OPEN:** cluster demo) |

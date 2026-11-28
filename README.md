@@ -5,7 +5,7 @@ end-to-end MLOps system: versioned data, tracked experiments, a quality
 gate that can say *no*, a containerised API, and an interactive
 dashboard.
 
-![tests](https://img.shields.io/badge/tests-254%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-259%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.11-blue)
 ![licence](https://img.shields.io/badge/licence-MIT-informational)
 ![status](https://img.shields.io/badge/status-academic%20prototype-orange)
@@ -231,7 +231,7 @@ feature_store/         Feast repo + materialisation demo
 pipelines/
   airflow/dags/        hourly_ingest · ml_orchestrator · retraining
   kubeflow/            pipeline_definition.py → compiled_pipeline.yaml
-tests/                 254 tests across 6 categories
+tests/                 259 tests across 6 categories
 k8s/                   deployment · service · hpa · pdb · networkpolicy
 monitoring/            prometheus.yml · alert_rules.yml · grafana dashboard
 frontend/              React dashboard
@@ -270,7 +270,7 @@ Names only — never commit values. Copy `.env.example` to `.env`.
 ## Testing
 
 ```bash
-pytest -q                                   # 254 tests, 72% coverage
+pytest -q                                   # 259 tests, 72% coverage
 pytest --cov=src --cov-report=term-missing
 ```
 

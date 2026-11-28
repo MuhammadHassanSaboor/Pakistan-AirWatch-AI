@@ -305,11 +305,18 @@ class _Client:
     def get_run(self, run_id):
         return _Run(self._metrics.get(run_id, {}))
 
+    # Both of these record the version EXACTLY as it was passed. They
+    # used to coerce it with str(), which quietly made the stub more
+    # forgiving than the real REST store -- an int version sails
+    # through here but raises inside protobuf against a live server.
+    # That difference hid a real bug that put a model into Production
+    # with no `approved_by` tag, so the stub now preserves the type and
+    # the tests assert on it.
     def transition_model_version_stage(self, name, version, stage, **kwargs):
-        self.transitions.append((name, str(version), stage, kwargs))
+        self.transitions.append((name, version, stage, kwargs))
 
     def set_model_version_tag(self, _name, version, key, value):
-        self.tags.append((str(version), key, value))
+        self.tags.append((version, key, value))
 
 
 def _install_client(monkeypatch, client):
@@ -396,6 +403,127 @@ def test_promotion_records_who_approved_it(monkeypatch):
     keys = {key: value for _v, key, value in client.tags}
     assert keys["approved_by"] == "hassan"
     assert "promoted_at" in keys
+
+
+def test_registry_calls_pass_the_version_as_a_string(monkeypatch):
+    """Regression guard: MLflow's REST store needs a string version.
+
+    An int reaches a protobuf string field and raises "bad argument
+    type for built-in operation" from inside protobuf -- but only
+    against a real server, and only *after* the stage transition has
+    already gone through. That left a model in Production with no
+    `approved_by` tag: the audit trail silently missing on the one
+    operation that most needs it.
+
+    These tests stub the MLflow client, and a stub happily accepts an
+    int, which is exactly why the original bug survived a green suite.
+    So assert the type we send rather than trusting the stub.
+    """
+    client = _Client(
+        [_Version(8, "Staging", "good")],
+        {"good": {"test_mae": 8.0, "improvement_pct": 42.0}},
+    )
+    _install_client(monkeypatch, client)
+    monkeypatch.setattr(registry, "production_metrics", dict)
+
+    registry.promote_to_production(8, approved_by="hassan")
+
+    assert client.tags, "no version tags were set at all"
+    for version, key, _value in client.tags:
+        assert isinstance(version, str), (
+            f"set_model_version_tag got {type(version).__name__} for {key!r}; "
+            "MLflow's REST store requires a string version"
+        )
+    assert client.transitions, "no stage transition was requested"
+    for _name, version, _stage, _kwargs in client.transitions:
+        assert isinstance(version, str), (
+            "transition_model_version_stage got "
+            f"{type(version).__name__}; it must be a string"
+        )
+
+
+# ──────────────────────────────────────────────────────────────
+# Local export: the served weights must match the served provenance
+# ──────────────────────────────────────────────────────────────
+class _Tags:
+    def __init__(self, tags):
+        self.tags = tags
+
+
+class _TaggedRun:
+    """Just enough of an MLflow Run to carry tags."""
+
+    def __init__(self, **tags):
+        self.data = _Tags(tags)
+
+
+def _candidate(root, name, run_id, payload=b"new-weights"):
+    d = root / "models" / "candidates" / name
+    d.mkdir(parents=True)
+    (d / "metadata.json").write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+    (d / "model.pkl").write_bytes(payload)
+    return d
+
+
+def test_export_syncs_the_pickle_from_the_matching_candidate(monkeypatch, tmp_path):
+    """The crux: MLflow writes model.xgb, the loader reads model.pkl.
+
+    Without this sync an export leaves the previous version's
+    model.pkl in place while replacing metadata.json, so /model-info
+    advertises the new model and the API serves the old weights.
+    """
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    _candidate(tmp_path, "xgboost-run-b", "run-b", b"weights-for-run-b")
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"weights-for-run-a")  # stale
+
+    registry._sync_pickle(
+        dest, "run-b", _TaggedRun(model_family="xgboost"), from_export=False
+    )
+    assert (dest / "model.pkl").read_bytes() == b"weights-for-run-b"
+
+
+def test_export_never_takes_a_candidate_from_a_different_run(monkeypatch, tmp_path):
+    """Matched on run_id, not on directory name."""
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    _candidate(tmp_path, "xgboost-run-a", "run-a", b"weights-for-run-a")
+    monkeypatch.setattr(registry, "_pickle_from_registry", lambda *a, **k: False)
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"weights-for-run-a")
+
+    registry._sync_pickle(
+        dest, "run-b", _TaggedRun(model_family="xgboost"), from_export=False
+    )
+    # run-a's weights are not run-b's, so nothing may be served.
+    assert not (dest / "model.pkl").exists()
+
+
+def test_export_deletes_a_stale_pickle_it_cannot_replace(monkeypatch, tmp_path):
+    """Refusing to start beats serving weights that are not the ones
+    metadata.json claims."""
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(registry, "_pickle_from_registry", lambda *a, **k: False)
+
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"stale")
+
+    registry._sync_pickle(dest, "run-x", _TaggedRun(), from_export=False)
+    assert not (dest / "model.pkl").exists()
+
+
+def test_export_keeps_a_pickle_the_registry_itself_provided(monkeypatch, tmp_path):
+    monkeypatch.setattr(registry, "PROJECT_ROOT", tmp_path)
+    dest = tmp_path / "models" / "production"
+    dest.mkdir(parents=True)
+    (dest / "model.pkl").write_bytes(b"from-registry")
+
+    registry._sync_pickle(dest, "run-y", _TaggedRun(), from_export=True)
+    assert (dest / "model.pkl").read_bytes() == b"from-registry"
 
 
 def test_rollback_restores_the_most_recent_archived_version(monkeypatch):
