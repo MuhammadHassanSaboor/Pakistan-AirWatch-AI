@@ -1,0 +1,92 @@
+﻿{
+    "description":  "Head-to-head on identical data: 36 largest cities, 2022-08-05..2026-11-27, 100 features, chronological split (train\u003c=2025-05-31, val\u003c=2025-12-31, test after). Same harness (src/models/train_base.py) for both.",
+    "generated_at":  "2026-11-28T13:58:19.0900471Z",
+    "dataset":  {
+                    "feature_rows":  5441652,
+                    "cities":  36,
+                    "raw_rows":  1361664,
+                    "test_rows":  1142388
+                },
+    "hassan_xgboost":  {
+                           "val_mae":  10.40455,
+                           "val_rmse":  17.60126,
+                           "val_r2":  0.83078,
+                           "test_mae":  11.02023,
+                           "test_rmse":  18.9814,
+                           "test_r2":  0.80034,
+                           "mae_h1":  3.43318,
+                           "mae_h6":  12.08471,
+                           "mae_h12":  13.9158,
+                           "mae_h24":  14.66247,
+                           "baseline_mae":  19.19119,
+                           "improvement_pct":  42.57659,
+                           "train_seconds":  1201.48178,
+                           "model_family":  "xgboost",
+                           "member":  "hassan",
+                           "run_name":  "xgboost-d8-lr0.05-n400",
+                           "quality_gate_passed":  true
+                       },
+    "mudassar_blend":  {
+                           "val_mae":  10.00267,
+                           "val_rmse":  16.84715,
+                           "val_r2":  0.84497,
+                           "test_mae":  10.63605,
+                           "test_rmse":  18.30473,
+                           "test_r2":  0.81432,
+                           "mae_h1":  3.01307,
+                           "mae_h6":  11.38805,
+                           "mae_h12":  13.59759,
+                           "mae_h24":  14.56144,
+                           "baseline_mae":  19.19119,
+                           "improvement_pct":  44.57846,
+                           "train_seconds":  4089.73139,
+                           "model_family":  "blend",
+                           "member":  "mudassar",
+                           "run_name":  "mudassar-blend",
+                           "quality_gate_passed":  true
+                       },
+    "selection":  {
+                      "n_candidates":  2,
+                      "n_passed_gate":  2,
+                      "selected_run":  "mudassar-blend",
+                      "selected_family":  "blend",
+                      "selected_test_mae":  10.63605,
+                      "ranking":  [
+                                      {
+                                          "rank":  1,
+                                          "model_family":  "blend",
+                                          "member":  "mudassar",
+                                          "run_name":  "mudassar-blend",
+                                          "test_mae":  10.63605,
+                                          "test_rmse":  18.30473,
+                                          "test_r2":  0.81432,
+                                          "mae_h1":  3.01307,
+                                          "mae_h24":  14.56144,
+                                          "improvement_pct":  44.57846,
+                                          "quality_gate_passed":  true
+                                      },
+                                      {
+                                          "rank":  2,
+                                          "model_family":  "xgboost",
+                                          "member":  "hassan",
+                                          "run_name":  "xgboost-d8-lr0.05-n400",
+                                          "test_mae":  11.02023,
+                                          "test_rmse":  18.9814,
+                                          "test_r2":  0.80034,
+                                          "mae_h1":  3.43318,
+                                          "mae_h24":  14.66247,
+                                          "improvement_pct":  42.57659,
+                                          "quality_gate_passed":  true
+                                      }
+                                  ],
+                      "margin_over_runner_up_pct":  3.486
+                  },
+    "champion_challenger":  {
+                                "challenger_improvement_pct":  -3.612,
+                                "champion":  "mudassar-blend",
+                                "champion_mae":  10.6361,
+                                "promote":  false,
+                                "challenger_mae":  11.0202,
+                                "challenger":  "xgboost-d8-lr0.05-n400"
+                            }
+}
