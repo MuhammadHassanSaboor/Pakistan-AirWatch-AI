@@ -142,3 +142,6 @@ desktop.ini
 # Local editor / assistant tooling (per-developer, not the project)
 # ─────────────────────────────────────────────────────────────
 .claude/
+
+# Kubeflow local-runner artifacts
+local_outputs/

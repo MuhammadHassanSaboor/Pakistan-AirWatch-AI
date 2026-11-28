@@ -1,0 +1,33 @@
+# Local minikube overlay: the base manifests, plus a real model.
+#
+# The base Deployment mounts an emptyDir as the model store (a PVC in
+# production), so pods report "no model loaded" and never become Ready.
+# Here the model is mounted read-only from the minikube node instead.
+#
+#   minikube image load airwatch-api:latest
+#   minikube ssh -- sudo mkdir -p /data/airwatch/models
+#   minikube cp models/production/model.pkl     /data/airwatch/models/model.pkl
+#   minikube cp models/production/metadata.json /data/airwatch/models/metadata.json
+#   kubectl apply -k k8s-minikube
+#
+# Secrets: create airwatch-secrets from your .env, never from a file in Git:
+#   kubectl -n airwatch create secret generic airwatch-secrets \
+#     --from-literal=MLFLOW_TRACKING_USERNAME=... --from-literal=MLFLOW_TRACKING_PASSWORD=...
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../k8s
+
+patches:
+  - target:
+      kind: Deployment
+      name: airwatch-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: model-store
+          hostPath:
+            path: /data/airwatch/models
+            type: Directory

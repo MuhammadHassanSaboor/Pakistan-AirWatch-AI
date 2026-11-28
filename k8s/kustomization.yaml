@@ -1,0 +1,14 @@
+# Base manifests for the AirWatch API.   kubectl apply -k k8s/
+# secret.example.yaml is deliberately excluded: secrets are created from
+# the environment, never applied from a file in Git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - api-hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
