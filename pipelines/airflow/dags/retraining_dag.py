@@ -42,16 +42,25 @@ MAX_MODEL_AGE_DAYS = 30
 def check_drift(**context):
     from src.monitoring.drift import run_drift_check
 
+    ti = context["ti"]
     try:
         result = run_drift_check()
     except FileNotFoundError as exc:
         print(f"No live history yet ({exc}); treating drift as zero")
-        context["ti"].xcom_push(key="drift_share", value=0.0)
+        ti.xcom_push(key="psi_drift_share", value=0.0)
+        ti.xcom_push(key="retrain_recommended", value=False)
         return 0.0
 
-    context["ti"].xcom_push(key="drift_share", value=result["drift_share"])
-    print(f"Drift share: {result['drift_share']:.1%}")
-    return result["drift_share"]
+    # The decision comes from the detector itself, so the DAG and
+    # drift.py cannot disagree about what counts as drift.
+    ti.xcom_push(key="psi_drift_share", value=result["psi_drift_share"])
+    ti.xcom_push(key="retrain_recommended", value=result["retrain_recommended"])
+    print(
+        f"PSI drift: {len(result['drifted_features'])}/{result['n_features']} "
+        f"features ({result['psi_drift_share']:.1%}), "
+        f"retrain_recommended={result['retrain_recommended']}"
+    )
+    return result["psi_drift_share"]
 
 
 def check_model_age(**context):
@@ -80,13 +89,14 @@ def check_model_age(**context):
 def decide(**context):
     """Branch: retrain only when there is a reason to."""
     ti = context["ti"]
-    drift = ti.xcom_pull(task_ids="check_drift", key="drift_share") or 0.0
+    drift = ti.xcom_pull(task_ids="check_drift", key="psi_drift_share") or 0.0
+    drifted = ti.xcom_pull(task_ids="check_drift", key="retrain_recommended")
     age = ti.xcom_pull(task_ids="check_model_age", key="days_old") or 0
     manual = context["dag_run"].conf.get("force_retrain", False)
 
     reasons = []
-    if drift > 0.30:
-        reasons.append(f"data drift {drift:.1%} exceeds 30%")
+    if drifted:
+        reasons.append(f"significant PSI drift in {drift:.1%} of features")
     if age > MAX_MODEL_AGE_DAYS:
         reasons.append(f"model is {age} days old")
     if manual:

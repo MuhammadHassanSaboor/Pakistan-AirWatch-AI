@@ -644,9 +644,101 @@ def test_drift_check_flags_a_smog_season_shift(tmp_path):
     result = drift.run_drift_check(
         reference=reference, current=current, out_dir=tmp_path
     )
-    assert result["drift_share"] > drift.DRIFT_THRESHOLD
+    assert result["psi_drift_share"] >= drift.DRIFT_THRESHOLD
     assert result["retrain_recommended"] is True
     assert (tmp_path / "drift_report.json").exists()
+
+
+def _eight_feature_frame(rng, n):
+    """The eight monitored features, with roughly realistic shapes."""
+    return pd.DataFrame(
+        {
+            "pm2_5": rng.gamma(4, 15, n),
+            "pm10": rng.gamma(5, 25, n),
+            "nitrogen_dioxide": rng.gamma(3, 6, n),
+            "ozone": rng.gamma(6, 12, n),
+            "temperature_2m": rng.normal(25, 6, n),
+            "relative_humidity_2m": rng.uniform(15, 95, n),
+            "wind_speed_10m": rng.gamma(2, 3, n),
+            "boundary_layer_height": rng.gamma(3, 300, n),
+        }
+    )
+
+
+def _saturated_evidently(reference, current, out_html):
+    """What Evidently reports at large sample sizes: everything drifted."""
+    n = len(reference.columns)
+    return {
+        "n_features": n,
+        "n_drifted": n,
+        "drift_share": 1.0,
+        "engine": "evidently",
+        "html": str(out_html),
+    }
+
+
+def test_retrain_ignores_a_saturated_evidently_share(tmp_path, monkeypatch):
+    """Regression test for the known issue in notebook 03, section 3.2.
+
+    The control window (two adjacent weeks) had Evidently drift_share
+    1.00 but significant PSI in only 1 of 8 features. The old code
+    thresholded on drift_share and recommended retraining; it must not.
+    """
+    monkeypatch.setattr(drift, "_evidently_report", _saturated_evidently)
+    rng = np.random.default_rng(11)
+    reference = _eight_feature_frame(rng, 20_000)
+    current = _eight_feature_frame(rng, 20_000)
+    # One feature moves moderately, as humidity did in the control.
+    current["relative_humidity_2m"] = np.clip(
+        current["relative_humidity_2m"] + 18, 0, 100
+    )
+
+    result = drift.run_drift_check(
+        reference=reference, current=current, out_dir=tmp_path
+    )
+    assert result["drift_share"] == 1.0  # Evidently still saturated
+    assert result["drifted_features"] == ["relative_humidity_2m"]
+    assert result["retrain_recommended"] is False
+
+
+def test_retrain_fires_on_a_seasonal_shift(tmp_path, monkeypatch):
+    """Two of eight features significantly drifted (the seasonal case)."""
+    monkeypatch.setattr(drift, "_evidently_report", _saturated_evidently)
+    rng = np.random.default_rng(12)
+    reference = _eight_feature_frame(rng, 20_000)
+    current = _eight_feature_frame(rng, 20_000)
+    current["temperature_2m"] -= 15
+    current["ozone"] *= 1.6
+
+    result = drift.run_drift_check(
+        reference=reference, current=current, out_dir=tmp_path
+    )
+    assert sorted(result["drifted_features"]) == ["ozone", "temperature_2m"]
+    assert result["psi_drift_share"] == 0.25
+    assert result["retrain_recommended"] is True
+
+
+def test_psi_decision_is_the_same_with_or_without_evidently(tmp_path, monkeypatch):
+    """The retrain decision must not depend on which engine ran."""
+    rng = np.random.default_rng(13)
+    reference = _eight_feature_frame(rng, 5_000)
+    current = reference.copy()
+    current["pm2_5"] *= 3.5
+    current["pm10"] *= 3.0
+    current["temperature_2m"] -= 12
+
+    with_evidently = drift.run_drift_check(
+        reference=reference, current=current, out_dir=tmp_path / "a"
+    )
+    monkeypatch.setattr(drift, "_evidently_report", lambda *a, **k: None)
+    psi_only = drift.run_drift_check(
+        reference=reference, current=current, out_dir=tmp_path / "b"
+    )
+    assert psi_only["engine"] == "psi"
+    assert with_evidently["psi"] == psi_only["psi"]
+    assert (
+        with_evidently["retrain_recommended"] == psi_only["retrain_recommended"] is True
+    )
 
 
 def test_drift_check_is_quiet_when_nothing_changed(tmp_path):
@@ -688,4 +780,7 @@ def test_drift_report_is_json_serialisable(tmp_path):
     drift.run_drift_check(reference=frame, current=frame.copy(), out_dir=tmp_path)
     payload = json.loads((tmp_path / "drift_report.json").read_text(encoding="utf-8"))
     assert "drift_share" in payload
+    assert "psi_drift_share" in payload
+    assert "drifted_features" in payload
+    assert isinstance(payload["retrain_recommended"], bool)
     assert "generated_at" in payload

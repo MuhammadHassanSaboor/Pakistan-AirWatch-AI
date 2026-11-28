@@ -148,12 +148,13 @@ def check_drift(**context):
     except FileNotFoundError as exc:
         raise AirflowSkipException(f"Drift check skipped: {exc}") from exc
 
-    context["ti"].xcom_push(key="drift_share", value=result["drift_share"])
+    context["ti"].xcom_push(key="psi_drift_share", value=result["psi_drift_share"])
     print(
-        f"Drift share: {result['drift_share']:.2%} "
-        f"({result['n_drifted']}/{result['n_features']} features)"
+        f"PSI drift: {result['psi_drift_share']:.2%} "
+        f"({len(result['drifted_features'])}/{result['n_features']} features), "
+        f"retrain_recommended={result['retrain_recommended']}"
     )
-    return result["drift_share"]
+    return result["psi_drift_share"]
 
 
 with DAG(

@@ -49,7 +49,21 @@ MONITORED = [
     "boundary_layer_height",
 ]
 
-DRIFT_THRESHOLD = 0.30  # retrain when >30% of features have drifted
+# A feature counts as drifted when its PSI exceeds this. The usual rule
+# of thumb: <0.1 stable, 0.1-0.25 moderate, >0.25 significant.
+PSI_SIGNIFICANT = 0.25
+
+# Retrain when at least this share of monitored features show
+# significant PSI drift. With the 8 features above that is 2 or more.
+#
+# Why PSI and not Evidently's drift_share: drift_share counts columns
+# whose statistical test (KS) rejects "same distribution". With tens of
+# thousands of rows per window, KS rejects on differences far too small
+# to matter, so the share saturates at 100% and fired even on a control
+# window of two adjacent weeks (notebook 03, section 3.2). PSI measures
+# how MUCH a distribution moved, not whether the move is detectable, so
+# it separates the cases: control 1/8, seasonal 2/8, simulated smog 6/8.
+DRIFT_THRESHOLD = 0.25
 
 
 def _load_reference(n_days: int = 90) -> pd.DataFrame:
@@ -146,39 +160,46 @@ def run_drift_check(
 
     result = _evidently_report(reference[cols], current[cols], html_path)
 
+    # PSI is computed whichever engine ran: it drives the retrain
+    # decision, and it is interpretable per feature.
+    per_feature = {c: _psi(reference[c], current[c]) for c in cols}
+    drifted = [c for c, v in per_feature.items() if v > PSI_SIGNIFICANT]
+    psi_drift_share = len(drifted) / len(cols)
+
     if result is None:
-        per_feature = {c: _psi(reference[c], current[c]) for c in cols}
-        drifted = [c for c, v in per_feature.items() if v > 0.25]
+        # No Evidently: its share would have been the PSI share anyway.
         result = {
             "n_features": len(cols),
             "n_drifted": len(drifted),
-            "drift_share": len(drifted) / len(cols),
+            "drift_share": psi_drift_share,
             "engine": "psi",
-            "psi": {k: round(v, 4) for k, v in per_feature.items()},
-            "drifted_features": drifted,
         }
-    else:
-        # Always include PSI: it is interpretable per feature, which
-        # the Evidently share alone is not.
-        result["psi"] = {c: round(_psi(reference[c], current[c]), 4) for c in cols}
 
     result.update(
         {
+            "psi": {k: round(v, 4) for k, v in per_feature.items()},
+            "drifted_features": drifted,
+            "psi_drift_share": psi_drift_share,
+            "max_psi": round(max(per_feature.values()), 4),
             "generated_at": datetime.now(UTC).isoformat(),
             "reference_rows": int(len(reference)),
             "current_rows": int(len(current)),
+            "psi_significant": PSI_SIGNIFICANT,
             "threshold": DRIFT_THRESHOLD,
-            "retrain_recommended": result["drift_share"] > DRIFT_THRESHOLD,
+            # The decision uses PSI, never Evidently's drift_share,
+            # which saturates at large sample sizes (see DRIFT_THRESHOLD).
+            "retrain_recommended": bool(psi_drift_share >= DRIFT_THRESHOLD),
         }
     )
 
     json_path = out_dir / "drift_report.json"
     json_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     log.info(
-        "Drift: %.1f%% of features (%d/%d), retrain=%s",
-        result["drift_share"] * 100,
-        result["n_drifted"],
-        result["n_features"],
+        "Drift: PSI>%.2f in %d/%d features (%.1f%%), retrain=%s",
+        PSI_SIGNIFICANT,
+        len(drifted),
+        len(cols),
+        psi_drift_share * 100,
         result["retrain_recommended"],
     )
     return result
@@ -228,14 +249,15 @@ def main() -> None:
 
     print(f"\nEngine          : {result['engine']}")
     print(f"Features checked: {result['n_features']}")
-    print(f"Drifted         : {result['n_drifted']}")
-    print(f"Drift share     : {result['drift_share']:.1%}")
+    print(f"Drifted (PSI)   : {len(result['drifted_features'])}")
+    print(f"PSI drift share : {result['psi_drift_share']:.1%}")
     print(f"Threshold       : {result['threshold']:.0%}")
+    print(f"Evidently share : {result['drift_share']:.1%}  (reported, not used)")
     print(f"Retrain needed  : {result['retrain_recommended']}")
     if result.get("psi"):
-        print("\nPSI by feature (>0.25 = significant):")
+        print(f"\nPSI by feature (>{PSI_SIGNIFICANT} = significant):")
         for feature, value in sorted(result["psi"].items(), key=lambda kv: -kv[1]):
-            flag = "  <-- drifted" if value > 0.25 else ""
+            flag = "  <-- drifted" if value > PSI_SIGNIFICANT else ""
             print(f"  {feature:24} {value:7.4f}{flag}")
 
 
