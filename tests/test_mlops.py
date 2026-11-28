@@ -47,6 +47,93 @@ def test_dataset_version_reports_untracked_data(tmp_path):
     assert tracking.dataset_version(tmp_path / "nothing.parquet") == "untracked"
 
 
+# Datasets produced by a DVC *pipeline* stage have no `.dvc` sidecar --
+# their hashes live in dvc.lock. Only the sidecar was read for a while,
+# so every pipeline output looked untracked and every MLflow run was
+# tagged `dataset_version: untracked`, which is precisely the tag that
+# makes a three-member comparison table trustworthy.
+LOCK = """\
+schema: '2.0'
+stages:
+  features:
+    cmd: python -m src.features.build_features
+    deps:
+    - path: data/raw/airquality_hourly.parquet
+      md5: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    outs:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: b3dce04aad6b7bb9d829a9ffd94edce2
+      size: 1324635702
+    - path: reports/feature_summary.json
+      hash: md5
+      md5: e4452bc2497e3f16ff742f958a2209b6
+"""
+
+
+def test_dataset_version_reads_the_dvc_lock_for_pipeline_outputs(monkeypatch, tmp_path):
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert (
+        tracking.dataset_version("data/processed/features.parquet")
+        == "b3dce04aad6b7bb9d829a9ffd94edce2"
+    )
+
+
+def test_dataset_version_matches_the_right_output_in_a_multi_output_stage(
+    monkeypatch, tmp_path
+):
+    """A stage with several outs must not return the first hash blindly."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert (
+        tracking.dataset_version("reports/feature_summary.json")
+        == "e4452bc2497e3f16ff742f958a2209b6"
+    )
+
+
+def test_dataset_version_does_not_match_a_dependency(monkeypatch, tmp_path):
+    """Only `outs` identify what a stage produced; deps belong to others."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    # The raw file is a dep of `features` but the out of `ingest`, which
+    # this cut-down lock omits -- so it is genuinely not recorded here.
+    assert tracking.dataset_version("data/raw/airquality_hourly.parquet") == "untracked"
+
+
+def test_dataset_version_accepts_windows_separators(monkeypatch, tmp_path):
+    """DVC writes POSIX paths into dvc.lock even on Windows."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert (
+        tracking.dataset_version(r"data\processed\features.parquet")
+        == "b3dce04aad6b7bb9d829a9ffd94edce2"
+    )
+
+
+def test_dataset_version_survives_a_malformed_lock(monkeypatch, tmp_path):
+    """A broken lock must not crash a training run that is otherwise fine."""
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(": not: valid: yaml: [", encoding="utf-8")
+    assert tracking.dataset_version("data/processed/features.parquet") == "untracked"
+
+
+def test_the_real_feature_table_is_dvc_tracked():
+    """Regression guard on the committed repo, not on a fixture.
+
+    This is the assertion that would have caught the whole problem:
+    the project's own feature table must resolve to a real md5, so no
+    run can be logged against an unidentified dataset again.
+    """
+    version = tracking.dataset_version("data/processed/features.parquet")
+    assert version != "untracked", (
+        "data/processed/features.parquet is not recorded in dvc.lock -- "
+        "run `dvc commit` (or `dvc repro`) and commit dvc.lock"
+    )
+    assert len(version) == 32, f"expected an md5, got {version!r}"
+    int(version, 16)  # raises unless it is hexadecimal
+
+
 def test_standard_tags_include_everything_the_comparison_needs(tmp_path):
     tags = tracking.standard_tags("xgboost", tmp_path / "x.parquet")
     for key in (

@@ -30,10 +30,35 @@ scipy==1.14.1
 joblib==1.4.2
 matplotlib==3.9.2
 
-# ── Experiment tracking ───────────────────────────────────────
+# ── Experiment tracking & data versioning ─────────────────────
 mlflow==2.17.0
 dvc==3.55.2
 dvc-s3==3.2.0
+
+# dvc-s3 declares s3fs but not boto3, and DVC refuses an s3:// remote
+# without it ("URL 's3://' is supported but requires these missing
+# dependencies: ['boto3']"), so the DagsHub remote is unusable until
+# boto3 is installed explicitly.
+#
+# The versions are pinned together on purpose. boto3 pulls the newest
+# botocore, but s3fs talks to S3 through aiobotocore, which pins
+# botocore to a narrow range -- take the newest and every DVC push
+# fails inside aiobotocore instead.
+boto3==1.43.117
+botocore==1.43.117
+
+# DVC 3.55 imports a private name from pathspec that pathspec 1.0
+# removed, and its own requirement (>=0.10.3) has no upper bound, so a
+# fresh install silently takes 1.x and then every dvc command dies with
+# "cannot import name '_DIR_MARK'". Hold it on the last 0.x.
+pathspec==0.12.1
+
+# ── Notebooks ─────────────────────────────────────────────────
+# Needed only to run or re-execute notebooks/, not by src/ or the API.
+nbformat==5.10.4
+nbclient==0.10.0
+nbconvert==7.16.4
+ipykernel==6.29.5
 
 # ── Serving ───────────────────────────────────────────────────
 Flask==3.0.3

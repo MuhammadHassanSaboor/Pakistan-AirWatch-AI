@@ -1,0 +1,218 @@
+schema: '2.0'
+stages:
+  cities:
+    cmd: python -m src.data.cities
+    deps:
+    - path: src/data/cities.py
+      hash: md5
+      md5: b561a7d79d9be8fc0fce5ea0b7c0a8bc
+      size: 13771
+    params:
+      configs/data_config.yaml:
+        cities:
+          file: data/reference/pakistan_cities.csv
+          target_count: 130
+          min_population: 20000
+          bbox:
+            lat_min: 23.5
+            lat_max: 37.1
+            lon_min: 60.8
+            lon_max: 77.9
+    outs:
+    - path: data/reference/pakistan_cities.csv
+      hash: md5
+      md5: 45256a97c7bb092bba5ef218ac15025e
+      size: 7515
+  ingest:
+    cmd: python -m src.data.ingestion
+    deps:
+    - path: data/reference/pakistan_cities.csv
+      hash: md5
+      md5: 45256a97c7bb092bba5ef218ac15025e
+      size: 7515
+    - path: src/data/ingestion.py
+      hash: md5
+      md5: 409e9410448a4e7328dfc81294a44c35
+      size: 12784
+    - path: src/data/openmeteo.py
+      hash: md5
+      md5: 45daedd784b336cdd7b0af8a293a4f35
+      size: 14395
+    params:
+      configs/data_config.yaml:
+        fetch:
+          batch_size: 12
+          chunk_months: 6
+          sleep_seconds: 3.0
+          max_retries: 8
+          backoff_seconds: 65
+          timeout_seconds: 45
+          resume: true
+        openmeteo_air_quality:
+          archive_url: https://air-quality-api.open-meteo.com/v1/air-quality
+          live_url: https://air-quality-api.open-meteo.com/v1/air-quality
+          variables:
+          - pm2_5
+          - pm10
+          - carbon_monoxide
+          - nitrogen_dioxide
+          - sulphur_dioxide
+          - ozone
+          - dust
+          - aerosol_optical_depth
+          - uv_index
+          live:
+            past_days: 2
+            forecast_days: 3
+        openmeteo_weather:
+          archive_url: https://archive-api.open-meteo.com/v1/archive
+          forecast_url: https://api.open-meteo.com/v1/forecast
+          variables:
+          - temperature_2m
+          - relative_humidity_2m
+          - precipitation
+          - surface_pressure
+          - cloud_cover
+          - wind_speed_10m
+          - wind_direction_10m
+          - wind_gusts_10m
+          - boundary_layer_height
+          - shortwave_radiation
+        time:
+          air_quality_start: '2022-08-05'
+          weather_start: '2022-08-05'
+          timezone: UTC
+          frequency: hourly
+    outs:
+    - path: data/raw/airquality_hourly.parquet
+      hash: md5
+      md5: c44c27395799c1bc4df9e44c0d3cef26
+      size: 63734226
+  validate:
+    cmd: python -m src.data.validation --strict
+    deps:
+    - path: data/raw/airquality_hourly.parquet
+      hash: md5
+      md5: c44c27395799c1bc4df9e44c0d3cef26
+      size: 63734226
+    - path: src/data/validation.py
+      hash: md5
+      md5: 059340d3104943619fee7b0f5d000e70
+      size: 11679
+    outs:
+    - path: reports/data_quality.json
+      hash: md5
+      md5: 4c40731df0be3f653bc13b941c6e663a
+      size: 6413
+  features:
+    cmd: python -m src.features.build_features
+    deps:
+    - path: data/raw/airquality_hourly.parquet
+      hash: md5
+      md5: c44c27395799c1bc4df9e44c0d3cef26
+      size: 63734226
+    - path: data/reference/pakistan_cities.csv
+      hash: md5
+      md5: 45256a97c7bb092bba5ef218ac15025e
+      size: 7515
+    - path: src/features/build_features.py
+      hash: md5
+      md5: 2959fe7d979a205bea13279edcd9fe5f
+      size: 3423
+    - path: src/features/preprocessing.py
+      hash: md5
+      md5: def490e8665cace5b3fbf04e66fda9da
+      size: 16722
+    params:
+      configs/model_params.yaml:
+        features:
+          lags:
+          - 1
+          - 2
+          - 3
+          - 6
+          - 12
+          - 24
+          - 48
+          - 72
+          - 168
+          rolling_windows:
+          - 3
+          - 6
+          - 12
+          - 24
+          - 72
+          n_spatial_neighbours: 3
+          exclude:
+          - y
+          - timestamp
+          - city_id
+          - city_name
+          - province
+          - ingested_at
+          - data_source
+        horizons:
+        - 1
+        - 6
+        - 12
+        - 24
+        target: pm2_5
+    outs:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: b3dce04aad6b7bb9d829a9ffd94edce2
+      size: 1324635702
+    - path: reports/feature_summary.json
+      hash: md5
+      md5: e4452bc2497e3f16ff742f958a2209b6
+      size: 2658
+  train:
+    cmd: python -m src.models.train_xgboost
+    deps:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: b3dce04aad6b7bb9d829a9ffd94edce2
+      size: 1324635702
+    - path: src/features/splits.py
+      hash: md5
+      md5: 4d9625f5374259de644e5d1056ae518c
+      size: 3729
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: 7f31ff42814d0b029ace7ade9f3cab4b
+      size: 9193
+    - path: src/models/train_base.py
+      hash: md5
+      md5: a86e39431274172ebf10cdc243f4f57e
+      size: 10091
+    - path: src/models/train_xgboost.py
+      hash: md5
+      md5: e67a0fc940b8b9a6412ab83d4f07f003
+      size: 3939
+    params:
+      configs/model_params.yaml:
+        quality_gate:
+          max_test_mae: 25.0
+          min_improvement_over_baseline_pct: 15.0
+          min_improvement_over_production_pct: 2.0
+        split:
+          train_end: '2025-05-31T23:00:00Z'
+          val_end: '2025-12-31T23:00:00Z'
+        xgboost:
+          objective: reg:absoluteerror
+          tree_method: hist
+          max_depth: 8
+          learning_rate: 0.05
+          n_estimators: 400
+          subsample: 0.8
+          colsample_bytree: 0.8
+          min_child_weight: 5
+          reg_lambda: 1.0
+          early_stopping_rounds: 50
+          random_state: 42
+          n_jobs: -1
+    outs:
+    - path: reports/train_metrics.json
+      hash: md5
+      md5: 594354cc38ab91ab1653017352c9aada
+      size: 456
