@@ -15,7 +15,6 @@ keeps the project runnable for anyone who clones the public repo.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import os
 import subprocess
@@ -80,15 +79,25 @@ def dataset_version(path: str | Path) -> str:
     looked untracked and every run was tagged ``dataset_version:
     untracked`` -- the one tag that makes a comparison table
     trustworthy, silently absent.
+
+    Separators are normalised by string replacement rather than by
+    ``Path.as_posix()``, which is **platform dependent**: on Windows
+    ``Path(r"data\\x.parquet").as_posix()`` yields ``data/x.parquet``,
+    but on Linux a backslash is an ordinary filename character, so the
+    same call returns it unchanged and the lookup silently misses.
+    Doing it as a plain string makes the result identical everywhere.
+    (This is not hypothetical: it passed locally on Windows and failed
+    on the Linux CI runner.)
     """
-    rel = Path(path)
-    if rel.is_absolute():
-        # A path from outside the repo stays as it is; it simply will
-        # not match anything in dvc.lock, which is the correct answer.
-        with contextlib.suppress(ValueError):
-            rel = rel.relative_to(PROJECT_ROOT)
-    # DVC writes POSIX separators in dvc.lock even on Windows.
-    wanted = rel.as_posix()
+    # Normalise first, so the separator style cannot depend on the OS.
+    wanted = str(path).replace("\\", "/")
+
+    root = PROJECT_ROOT.as_posix().replace("\\", "/").rstrip("/")
+    if wanted.startswith(f"{root}/"):
+        wanted = wanted[len(root) + 1 :]
+    # A path from outside the repo stays absolute; it simply will not
+    # match anything in dvc.lock, which is the correct answer.
+    wanted = wanted.removeprefix("./")
 
     lock = PROJECT_ROOT / "dvc.lock"
     if lock.exists():

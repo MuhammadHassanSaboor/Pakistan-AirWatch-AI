@@ -497,8 +497,8 @@ side effect of writing a report.
 
 | | |
 |---|---|
-| Tests | **259 passing** |
-| Coverage | **71.68%** (gate: 70%) |
+| Tests | **262 passing** |
+| Coverage | **71.62%** (gate: 70%) |
 | CI | `.github/workflows/ci.yml` |
 
 CI runs `ruff check src tests pipelines`, `ruff format --check`,
@@ -573,7 +573,7 @@ Two cartographic decisions worth recording:
 | Model trains via a reproducible pipeline (`dvc repro`) | ✅ 5 stages, `dvc.lock` committed |
 | Data + code versions recoverable | ✅ verified by `scripts/demo_dvc_rollback.sh` |
 | Experiments in MLflow | ✅ shared DagsHub server (**OPEN:** 7 runs, 50+ expected) |
-| Tests run in GitHub Actions | ✅ 259 tests, 72% coverage, gate enforced |
+| Tests run in GitHub Actions | ✅ 262 tests, 72% coverage, gate enforced |
 | A failing quality gate blocks deployment | ✅ `scripts/demo_quality_gate.sh` |
 | Model served by Flask in Docker | ✅ |
 | Kubernetes deployment + scaling | ✅ manifests + HPA (**OPEN:** cluster demo) |

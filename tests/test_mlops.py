@@ -101,14 +101,57 @@ def test_dataset_version_does_not_match_a_dependency(monkeypatch, tmp_path):
     assert tracking.dataset_version("data/raw/airquality_hourly.parquet") == "untracked"
 
 
-def test_dataset_version_accepts_windows_separators(monkeypatch, tmp_path):
-    """DVC writes POSIX paths into dvc.lock even on Windows."""
+@pytest.mark.parametrize(
+    "given",
+    [
+        "data/processed/features.parquet",
+        r"data\processed\features.parquet",
+        "./data/processed/features.parquet",
+    ],
+)
+def test_dataset_version_normalises_separators_on_every_platform(
+    monkeypatch, tmp_path, given
+):
+    """Same answer for every spelling, on Windows and on Linux alike.
+
+    DVC always writes POSIX paths into dvc.lock. Normalising the lookup
+    key with `Path.as_posix()` looks right and is a trap: it is
+    platform dependent. On Windows a backslash is a separator so it
+    converts, but on Linux a backslash is an ordinary filename
+    character, so the key keeps its backslashes, never matches, and the
+    dataset silently reports as `untracked` -- losing the provenance
+    tag precisely where nobody is watching.
+
+    This is the bug that passed locally and failed on the Linux CI
+    runner, so the spellings are parametrised rather than trusted.
+    """
     monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
     (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
-    assert (
-        tracking.dataset_version(r"data\processed\features.parquet")
-        == "b3dce04aad6b7bb9d829a9ffd94edce2"
-    )
+    assert tracking.dataset_version(given) == "b3dce04aad6b7bb9d829a9ffd94edce2"
+
+
+def test_as_posix_is_the_wrong_tool_for_this(monkeypatch, tmp_path):
+    """Pin down *why* the normalisation is done with str.replace.
+
+    Asserts the platform difference directly, so nobody "simplifies"
+    the implementation back to `Path(path).as_posix()` and reintroduces
+    a failure that only shows up on Linux.
+    """
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    windows_style = r"data\processed\features.parquet"
+    expected = "data/processed/features.parquet"
+
+    # The trap: identical call, different answers per platform.
+    assert PureWindowsPath(windows_style).as_posix() == expected
+    assert PurePosixPath(windows_style).as_posix() != expected
+
+    # Plain string replacement agrees with the POSIX form everywhere.
+    assert windows_style.replace("\\", "/") == expected
+
+    monkeypatch.setattr(tracking, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "dvc.lock").write_text(LOCK, encoding="utf-8")
+    assert tracking.dataset_version(windows_style) == tracking.dataset_version(expected)
 
 
 def test_dataset_version_survives_a_malformed_lock(monkeypatch, tmp_path):
